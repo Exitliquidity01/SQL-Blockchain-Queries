@@ -1,0 +1,17 @@
+
+SELECT
+    '<a href="https://intel.arkm.com/explorer/address/' || CAST(taker AS VARCHAR) || '?cluster=mainnet-beta" target="_blank">' || CAST(taker AS VARCHAR) || '</a>' AS "Wallet (Solscan Link)",
+    '<a href="https://debank.com/profile/' || CAST(taker AS VARCHAR) || '/history?chain=eth&token=0xa9e8acf069c58aec8825542845fd754e41a9489a_pepecoin" target="_blank">' || CAST(taker AS VARCHAR) || '</a>' AS "Wallet (Debank Link)",
+    SUM(amount_usd) AS total_usd
+FROM
+    dex.trades
+WHERE
+    block_time >= TIMESTAMP '2024-11-07 14:00:00 UTC'
+    AND token_bought_address = 0xa9e8acf069c58aec8825542845fd754e41a9489a
+    AND taker NOT IN (SELECT address FROM ethereum.creation_traces)
+    AND taker NOT IN (SELECT address FROM cex.addresses)
+    AND taker NOT IN (SELECT address FROM labels.cex_ethereum)
+GROUP BY
+    taker
+HAVING
+    SUM(amount_usd) >= 5000;

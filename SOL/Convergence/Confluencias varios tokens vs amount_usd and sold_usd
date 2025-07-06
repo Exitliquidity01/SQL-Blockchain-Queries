@@ -1,0 +1,61 @@
+WITH AllTokens AS (
+    SELECT DISTINCT
+        to_owner AS wallet_address,
+        tx_id,
+        token_mint_address,
+        block_time
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address IN (
+            'Fosp9yoXQBdx8YqyURZePYzgpCnxp9XsfnQq69DRvvU4',
+            'GVwpWU5PtJFHS1mH35sHmsRN1XWUwRV3Qo94h5Lepump',
+            'FskzSqy7Pi1f3nWorr4WhhQboxzyv8fv6Q2e8xyDpump',
+            '9pWPUXoZKWNPWyaegPQeR3Kn8aFz9nrGtm5jeAFzpump'
+            
+        )
+),
+
+TokensFinal AS (
+    SELECT 
+        wallet_address,
+        token_mint_address,
+        MIN(tx_id) AS first_tx_id, 
+        COUNT(tx_id) AS tx_count
+    FROM 
+        AllTokens
+    GROUP BY 
+        wallet_address, token_mint_address
+),
+
+
+TradesSummary AS (
+    SELECT
+        t.wallet_address,
+        SUM(d.amount_usd) AS total_amount_usd
+    FROM 
+        TokensFinal t
+    LEFT JOIN 
+        dex_solana.trades d ON t.first_tx_id = d.tx_id
+    GROUP BY 
+        t.wallet_address
+)
+
+SELECT 
+    t.wallet_address,
+    COUNT(DISTINCT t.token_mint_address) AS distinct_tokens_count,
+    SUM(t.tx_count) AS total_tx_count, 
+    COALESCE(ts.total_amount_usd, 0) AS total_amount_usd,
+    LISTAGG(DISTINCT t.token_mint_address, ', ') WITHIN GROUP (ORDER BY t.token_mint_address) AS tokens_held, 
+    LISTAGG('https://solscan.io/tx/' || CAST(t.first_tx_id AS VARCHAR), ', ') WITHIN GROUP (ORDER BY t.first_tx_id) AS tx_links
+FROM 
+    TokensFinal t
+LEFT JOIN 
+    TradesSummary ts ON t.wallet_address = ts.wallet_address
+GROUP BY 
+    t.wallet_address, ts.total_amount_usd
+HAVING 
+    COUNT(DISTINCT t.token_mint_address) > 3
+    AND SUM(t.tx_count) < 50
+ORDER BY
+    SUM(t.tx_count);

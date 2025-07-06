@@ -1,0 +1,160 @@
+WITH 
+  total_supply AS (
+    SELECT 
+      value / POW(10, {{decimals}}) AS supply
+    FROM 
+      erc20_ethereum.evt_transfer
+    WHERE 
+      contract_address = {{token}}
+    ORDER BY 
+      evt_block_time ASC
+    LIMIT 1
+  ),
+ 
+  buys_list_1 AS (
+    SELECT
+      DATE_TRUNC('hour', evt_block_time) AS timestamp,
+      to AS buyer,
+      SUM(value / POW(10, {{decimals}})) AS amount_bought
+    FROM
+      erc20_ethereum.evt_transfer AS a
+      LEFT JOIN tokens.erc20 AS b ON a.contract_address = b.contract_address
+      AND blockchain = 'ethereum'
+    WHERE
+      a.contract_address = {{token}}
+      AND to IN ( --LIST EXAMPLE--
+     0x22e66Fe636c4C2652222E19D52329ae6717cEDee,
+0x6559E5219bcaa1C8466807C9Cc9F51669020Be8b,
+0x9DC50D15c6E49a234f6FE70497d04b9C5e46656B
+
+      )
+      AND to NOT IN (
+        SELECT address FROM ethereum.creation_traces
+      )
+      AND value IS NOT NULL
+    GROUP BY
+      1, 2
+  ),
+ 
+  sells_list_1 AS (
+    SELECT
+      DATE_TRUNC('hour', evt_block_time) AS timestamp,
+      "from" AS seller,
+      SUM(value / POW(10, {{decimals}})) AS amount_sold
+    FROM
+      erc20_ethereum.evt_transfer AS a
+      LEFT JOIN tokens.erc20 AS b ON a.contract_address = b.contract_address
+      AND blockchain = 'ethereum'
+    WHERE
+      a.contract_address = {{token}}
+      AND "from" IN ( --LIST EXAMPLE--
+0x22e66Fe636c4C2652222E19D52329ae6717cEDee,
+0x6559E5219bcaa1C8466807C9Cc9F51669020Be8b,
+0x9DC50D15c6E49a234f6FE70497d04b9C5e46656B,
+0xcc81aE44759abD4e0c41AB053357f9d83faC474e
+
+      )
+      AND value IS NOT NULL
+    GROUP BY
+      1, 2
+  ),
+ 
+  combined_list_1 AS (
+    SELECT
+      COALESCE(a.timestamp, b.timestamp) AS timestamp,
+      COALESCE(a.buyer, b.seller) AS holder,
+      COALESCE(amount_bought, 0) - COALESCE(amount_sold, 0) AS flow
+    FROM
+      buys_list_1 AS a
+    FULL OUTER JOIN sells_list_1 AS b 
+      ON a.timestamp = b.timestamp 
+      AND a.buyer = b.seller
+  ),
+ 
+  buys_list_2 AS (
+    SELECT
+      DATE_TRUNC('hour', evt_block_time) AS timestamp,
+      to AS buyer,
+      SUM(value / POW(10, {{decimals}})) AS amount_bought
+    FROM
+      erc20_ethereum.evt_transfer AS a
+      LEFT JOIN tokens.erc20 AS b ON a.contract_address = b.contract_address
+      AND blockchain = 'ethereum'
+    WHERE
+      a.contract_address = {{token}}
+      AND to IN ( --LIST EXAMPLE--
+0x2a00ec863d0Efd24981d574583454FCdC025A0DF,
+0xA413d1CAA37713931b188495b2bDb322419DCE29,
+0xAffF059b02dc8c8a48c77b0E773944AcdC783389,
+0x1033A742514Bd25e4556bEa16fB0D54450D3a2d3
+
+      )
+      AND to NOT IN (
+        SELECT address FROM ethereum.creation_traces
+      )
+      AND value IS NOT NULL
+    GROUP BY
+      1, 2
+  ),
+ 
+  sells_list_2 AS (
+    SELECT
+      DATE_TRUNC('hour', evt_block_time) AS timestamp,
+      "from" AS seller,
+      SUM(value / POW(10, {{decimals}})) AS amount_sold
+    FROM
+      erc20_ethereum.evt_transfer AS a
+      LEFT JOIN tokens.erc20 AS b ON a.contract_address = b.contract_address
+      AND blockchain = 'ethereum'
+    WHERE
+      a.contract_address = {{token}}
+      AND "from" IN ( --LIST EXAMPLE--
+0x2a00ec863d0Efd24981d574583454FCdC025A0DF,
+0xA413d1CAA37713931b188495b2bDb322419DCE29,
+0xAffF059b02dc8c8a48c77b0E773944AcdC783389,
+0x1033A742514Bd25e4556bEa16fB0D54450D3a2d3
+      )
+      AND value IS NOT NULL
+    GROUP BY
+      1, 2
+  ),
+  
+  combined_list_2 AS (
+    SELECT
+      COALESCE(a.timestamp, b.timestamp) AS timestamp,
+      COALESCE(a.buyer, b.seller) AS holder,
+      COALESCE(amount_bought, 0) - COALESCE(amount_sold, 0) AS flow
+    FROM
+      buys_list_2 AS a
+    FULL OUTER JOIN sells_list_2 AS b 
+      ON a.timestamp = b.timestamp 
+      AND a.buyer = b.seller
+  ),
+prices AS (
+    SELECT 
+      DATE_TRUNC('hour', minute) AS time, 
+      AVG(price) AS price 
+    FROM prices.usd
+    WHERE contract_address = 0x289ff00235d2b98b0145ff5d4435d3e92f9540a6
+    GROUP BY 1
+    ORDER BY 1
+)
+
+
+SELECT
+  COALESCE(list_1.timestamp, list_2.timestamp) AS timestamp,
+  SUM(SUM(list_1.flow)) OVER (ORDER BY COALESCE(list_1.timestamp, list_2.timestamp)) AS balance_list_1,
+  (SUM(SUM(list_1.flow)) OVER (ORDER BY COALESCE(list_1.timestamp, list_2.timestamp))) / (SELECT supply FROM total_supply) AS "Top Holder % Supply",
+  SUM(SUM(list_2.flow)) OVER (ORDER BY COALESCE(list_1.timestamp, list_2.timestamp)) AS balance_list_2,
+  (SUM(SUM(list_2.flow)) OVER (ORDER BY COALESCE(list_1.timestamp, list_2.timestamp))) / (SELECT supply FROM total_supply) AS "Middle Holders % Supply",
+  p.price AS token_price 
+FROM 
+  combined_list_1 AS list_1
+FULL OUTER JOIN combined_list_2 AS list_2
+ON list_1.timestamp = list_2.timestamp
+LEFT JOIN prices AS p 
+ON COALESCE(list_1.timestamp, list_2.timestamp) = p.time
+GROUP BY
+  COALESCE(list_1.timestamp, list_2.timestamp), p.price
+ORDER BY 
+  COALESCE(list_1.timestamp, list_2.timestamp) ASC;

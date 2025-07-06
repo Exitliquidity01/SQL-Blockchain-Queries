@@ -1,0 +1,111 @@
+WITH token1_balances AS (
+   
+    SELECT 
+      "to" AS wallet,
+      SUM(value / POW(10, {{decimals_token1}})) AS balance_token1
+    FROM 
+      erc20_ethereum.evt_transfer
+    WHERE 
+      contract_address = {{token1}}
+      AND "to" NOT IN (SELECT address FROM ethereum.creation_traces)
+      AND "to" NOT IN (SELECT address FROM cex.addresses)
+    GROUP BY 
+      "to"
+    UNION ALL
+    SELECT 
+      "from" AS wallet,
+      -SUM(value / POW(10, {{decimals_token1}})) AS balance_token1
+    FROM 
+      erc20_ethereum.evt_transfer
+    WHERE 
+      contract_address = {{token1}}
+      AND "from" NOT IN (SELECT address FROM ethereum.creation_traces)
+      AND "from" NOT IN (SELECT address FROM cex.addresses)
+    GROUP BY 
+      "from"
+),
+token2_balances AS (
+  
+    SELECT 
+      "to" AS wallet,
+      SUM(value / POW(10, {{decimals_token2}})) AS balance_token2
+    FROM 
+      erc20_ethereum.evt_transfer
+    WHERE 
+      contract_address = {{token2}}
+      AND "to" NOT IN (SELECT address FROM ethereum.creation_traces)
+      AND "to" NOT IN (SELECT address FROM cex.addresses)
+    GROUP BY 
+      "to"
+    UNION ALL
+    SELECT 
+      "from" AS wallet,
+      -SUM(value / POW(10, {{decimals_token2}})) AS balance_token2
+    FROM 
+      erc20_ethereum.evt_transfer
+    WHERE 
+      contract_address = {{token2}}
+      AND "from" NOT IN (SELECT address FROM ethereum.creation_traces)
+      AND "from" NOT IN (SELECT address FROM cex.addresses)
+    GROUP BY 
+      "from"
+),
+final_balances_token1 AS (
+ 
+    SELECT 
+      wallet,
+      SUM(balance_token1) AS final_balance_token1
+    FROM 
+      token1_balances
+    GROUP BY 
+      wallet
+    HAVING SUM(balance_token1) > 0 
+),
+final_balances_token2 AS (
+ 
+    SELECT 
+      wallet,
+      SUM(balance_token2) AS final_balance_token2
+    FROM 
+      token2_balances
+    GROUP BY 
+      wallet
+    HAVING SUM(balance_token2) > 0 
+),
+token1_supply AS (
+
+    SELECT 
+      value / POW(10, {{decimals_token1}}) AS supply_token1
+    FROM 
+      erc20_ethereum.evt_transfer
+    WHERE 
+      contract_address = {{token1}}
+    ORDER BY 
+      evt_block_time ASC
+    LIMIT 1
+),
+token2_supply AS (
+
+    SELECT 
+      value / POW(10, {{decimals_token2}}) AS supply_token2
+    FROM 
+      erc20_ethereum.evt_transfer
+    WHERE 
+      contract_address = {{token2}}
+    ORDER BY 
+      evt_block_time ASC
+    LIMIT 1
+)
+
+SELECT 
+  '<a href="https://debank.com/profile/' || CAST(fb1.wallet AS VARCHAR) || '" target="_blank">' || CAST(fb1.wallet AS VARCHAR) || '</a>' AS wallet,
+  fb1.final_balance_token1 AS "Balance Token 1",
+  (fb1.final_balance_token1 / (SELECT supply_token1 FROM token1_supply)) AS "% Supply Token 1",
+  fb2.final_balance_token2 AS "Balance Token 2",
+  (fb2.final_balance_token2 / (SELECT supply_token2 FROM token2_supply)) AS "% Supply Token 2"
+FROM 
+  final_balances_token1 fb1
+JOIN 
+  final_balances_token2 fb2 ON fb1.wallet = fb2.wallet
+ORDER BY 
+  fb1.wallet ASC;

@@ -1,0 +1,144 @@
+WITH 
+team_wallet AS (
+  SELECT 
+    'Team Wallet' AS transfer_level, 
+    to AS wallet,
+    NULL AS first_tx_hash,  
+    NULL AS first_block_time,  
+    0 AS raw_transfer_level 
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+  ORDER BY 
+    evt_block_time ASC
+  LIMIT 1
+),
+level_1 AS (
+  SELECT 
+    'Main ' || CAST(ROW_NUMBER() OVER (ORDER BY MIN(evt_block_time) ASC) AS VARCHAR) AS transfer_level,
+    to AS wallet,
+    MIN(evt_tx_hash) AS first_tx_hash,
+    MIN(evt_block_time) AS first_block_time,
+    ROW_NUMBER() OVER (ORDER BY MIN(evt_block_time) ASC) AS raw_transfer_level
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+    AND "from" IN (SELECT wallet FROM team_wallet)
+    AND to NOT IN (SELECT address FROM {{chain}}.creation_traces)
+  GROUP BY 
+    to
+),
+level_2 AS (
+  SELECT 
+    CAST(l1.raw_transfer_level AS VARCHAR) AS transfer_level,  
+    e.to AS wallet,
+    MIN(e.evt_tx_hash) AS first_tx_hash,
+    MIN(e.evt_block_time) AS first_block_time,
+    l1.raw_transfer_level AS raw_transfer_level
+  FROM 
+    erc20_{{chain}}.evt_transfer e
+  JOIN 
+    level_1 l1 ON e."from" = l1.wallet
+  WHERE 
+    e.contract_address = {{token}}
+    AND e.to NOT IN (SELECT address FROM {{chain}}.creation_traces)
+  GROUP BY 
+    e.to, l1.raw_transfer_level
+),
+wallet_balances AS (
+  SELECT 
+    to AS wallet, 
+    SUM(value / POW(10, {{decimals}})) AS balance_received
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+    AND to IN (SELECT wallet FROM level_1 UNION DISTINCT SELECT wallet FROM level_2 UNION DISTINCT SELECT wallet FROM team_wallet)
+  GROUP BY 
+    to
+  UNION ALL
+  SELECT 
+    "from" AS wallet, 
+    -SUM(value / POW(10, {{decimals}})) AS balance_sent
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+    AND "from" IN (SELECT wallet FROM level_1 UNION DISTINCT SELECT wallet FROM level_2 UNION DISTINCT SELECT wallet FROM team_wallet)
+  GROUP BY 
+    "from"
+),
+wallet_balances_final AS (
+  SELECT 
+    wallet,
+    SUM(balance_received) AS actual_balance
+  FROM 
+    wallet_balances
+  GROUP BY 
+    wallet
+),
+last_24h_buys AS (
+    SELECT
+        to AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS amount_bought_last_24h
+    FROM 
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND evt_block_time >= NOW() - INTERVAL '24' HOUR
+    GROUP BY to
+),
+last_24h_sells AS (
+    SELECT
+        "from" AS wallet,
+        -SUM(value / POW(10, {{decimals}})) AS amount_sold_last_24h
+    FROM 
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND evt_block_time >= NOW() - INTERVAL '24' HOUR
+    GROUP BY "from"
+),
+wallet_changes_24h AS (
+  SELECT 
+    COALESCE(b.wallet, s.wallet) AS wallet,
+    COALESCE(b.amount_bought_last_24h, 0) AS total_bought_24h,
+    COALESCE(s.amount_sold_last_24h, 0) AS total_sold_24h
+  FROM 
+    last_24h_buys b
+  FULL OUTER JOIN last_24h_sells s ON b.wallet = s.wallet
+),
+total_supply AS (
+  SELECT 
+    value / POW(10, {{decimals}}) AS supply
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+  ORDER BY 
+    evt_block_time ASC
+  LIMIT 1
+)
+SELECT 
+  l.transfer_level AS Cluster, 
+  '<a href="https://debank.com/profile/' || CAST(l.wallet AS VARCHAR) || '" target="_blank">' || CAST(l.wallet AS VARCHAR) || '</a>' AS wallet, 
+  wb.actual_balance AS "Actual Balance", 
+  (wb.actual_balance / (SELECT supply FROM total_supply)) AS "Actual % Supply", 
+  COALESCE(wc.total_bought_24h, 0) - COALESCE(wc.total_sold_24h, 0) AS change_last_24h, 
+  (COALESCE(wc.total_bought_24h, 0) - COALESCE(wc.total_sold_24h, 0)) / (SELECT supply FROM total_supply) AS percentage_change_last_24h,
+  '<a href="https://etherscan.io/tx/' || CAST(l.first_tx_hash AS VARCHAR) || '" target="_blank">' || CAST(l.first_tx_hash AS VARCHAR) || '</a>' AS "Tx Hash", 
+  l.first_block_time AS Timestamp 
+FROM 
+  (SELECT * FROM level_1 UNION DISTINCT SELECT * FROM level_2 UNION DISTINCT SELECT * FROM team_wallet) AS l 
+JOIN 
+  wallet_balances_final wb ON l.wallet = wb.wallet
+LEFT JOIN 
+  wallet_changes_24h wc ON l.wallet = wc.wallet
+ORDER BY 
+  CASE 
+    WHEN l.transfer_level = 'Team Wallet' THEN 0  
+    ELSE 1  
+  END,
+  l.first_block_time ASC;

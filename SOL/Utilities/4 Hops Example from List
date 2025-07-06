@@ -1,0 +1,280 @@
+WITH MintingAddresses AS (
+    SELECT DISTINCT
+        to_owner AS wallet_address
+    FROM
+        tokens_solana.transfers
+    WHERE
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+),
+
+InitialList AS (
+    SELECT DISTINCT
+        wallet_address
+    FROM (
+        VALUES 
+           ('CB2o4peiNoCCBx7XL9VGN6tbRnq3cB1u4Aoj4G9515z5'),
+('EgQawG3ZcNTyZZdUAXUtxCwg25WGXzKwoYh8DDQNU1Yr'),
+('1bgYLVzG3mVXtBFxUbayVgEBCU54TUud2JesVQgUDre'),
+('gF32RePRqNwgjZphXzBn4otZv2yGSGYA9YwEgsgXcrr'),
+('DLect9VLHaMU9nA63AAuFqRFPSkAPb42BAqCp3rm3KdD'),
+('532BnrS8ZNLaxG8PmifJg9xCoUMFYf4kJqv3VZTxE2Vu'),
+('7J3WYt8NNJHVRYFXqoFvPFWT3TrGr95ShEHtkLkbC15Y'),
+('HfYASS5V87r4YBwvdDKN3sKrfDfaHddHtFnv9qZEk2qs'),
+('HuhwyXS7gtto1DQUQMvnncFSP7VN4URCZLMLdNKYuchA'),
+('5gD5Vi3ir5p6hBHUhN7kGuhYc3Z1r8eMVLeqeQ9qm15t'),
+('Dcdsb8jKkJLs5R1oAZNs2Fi1nht5wRqXdiY9xSHA5WCG'),
+('4R3jUpcspsDtCPm3x5jPB7MM1KNJfhNWrAmB9nKwfGwy'),
+('CRTh6vmT2xbpUbGbUoKcEQ36okyGnXAhYvSr21XZX5Ti'),
+('8YfY9QjRiXwy9QxEA8Eh9Axvmr77xvNvQ9RsJaSk3xYq'),
+('5bgpVf2HpLrmGHWzVFe6tGfestxMMYPSrzHxPMfbuz7Z'),
+('GkT5jhwfRsn2N6kP4MKJ3Tx7L9UNGs4PXdh4noe8uSFA'),
+('2Di3mYGYuYifRVGsYt6cqPftkNyNa9tFvq7TC3bV7q4Q'),
+('8tgckUnyhqyo2KUsqwM5bLaoXEcsJXvFv4Dw7874QzmK'),
+('F78xwVpoEUSS3gk2J8Py1Vbh9dCMRMVoy94obAD598JM'),
+('9zZ89ciZXteVZxtcu8a16QdqzS8uQoxxghk8Kp3X2rJV'),
+('9unaPWUcoYTWZgdfrofsZiuMhwg9f9YqdWW8xAsDRFKe'),
+('7wEfz19bcuDD4iwC8WTK8Rap6Y59W4NswpLnKM7Xs8np'),
+('7aPzEW3McpcxkrRz7Upt2Z9ReSqKwHTfnNDUhiS2WyfP'),
+('UrV99UpQR6kQQirMwLDQjnTyTuxJ5GjBzeVbxWAy27N'),
+('9bUPJFCeri6ouW7qpEbtq8shZe3bYXZ9DdN3WK14SoZe'),
+('49kFRafrheGUhLnPSgECUuqHoKrS2DsKbpntjqVptmmZ'),
+('26hkUa5xFp53zkhqFTYiS6MeffVWqygPxkvP1HUiVmHq'),
+('7xeHmmRbMWB1Cd6D4KY6Nfbh3rxzJLMsMYUoieaP1Hcw'),
+('AGWVyztT7hVWxLUDKWvLwUwi6EbbVdde63XEEetfX7DD'),
+('AsR2kPnx28XyJgFn4MnDabyDE2knXaFt9Vh4QGHYkjrL'),
+('FPzguYAZG6ULjAHGJcFv62eRzSnfd3DwhzzTFC9MHivq'),
+('DHunEBWrt3fs1uxSqvqZJGmiqpZGzGGFvyg1iwVn6mc'),
+('4vUDhFbvDXC2h5pNGUzTob1ttjCxAFKddbu1qxtqV9sV'),
+('8jQJPEKQQsoGaVaDKA59q8cp6KEx68dRabDs55tjD5kh'),
+('HwK5WjL74gu8Y7K1B4TpksPWDvBQeSH7mwv8ZgniobdQ'),
+('Cas1irC9e38W5soLEh6xaucWN7FppHEMwpBk9m278JoT'),
+('FPzguYAZG6ULjAHGJcFv62eRzSnfd3DwhzzTFC9MHivq'),
+('DHunEBWrt3fs1uxSqvqZJGmiqpZGzGGFvyg1iwVn6mc'),
+('4wQdMSNE3DJRVLMMVZWkVWH88debjZD3cz2v22MKsCTK'),
+('2L63QdivyS6TFfBrihdfQKsCLg7v6HLaegq2avUthmf8'),
+('5Djsagx2DDk4sSHQk4QuzzNDQJHyn2PYu5dsHLoh2pPk'),
+('1vfEYPgXCFYwkAGJMtYK6yWAP5bJib8DdZMtCp4kY6f'),
+('4wQdMSNE3DJRVLMMVZWkVWH88debjZD3cz2v22MKsCTK'),
+('2L63QdivyS6TFfBrihdfQKsCLg7v6HLaegq2avUthmf8'),
+('5Djsagx2DDk4sSHQk4QuzzNDQJHyn2PYu5dsHLoh2pPk'),
+('1vfEYPgXCFYwkAGJMtYK6yWAP5bJib8DdZMtCp4kY6f'),
+('sJJKPpXknWMD5KirZ9WpxGzh8VeMKXrpy48uzYRUgcV'),
+('58McmothvPm3VT6Y79yAS8Q6DotaxUPq3WcxGodZvE8S'),
+('HTU9Z9f4gjLmxeVCfkALXh7Y4TGhXdSr7nB7xyn1fTe2'),
+('JDaQDNBvXNCVkKD6m7dJJyt973vJ7CD5nEJCeGHUVzog'),
+('2N9Q8Bx3WK86YHgVfan9ichCRgbadTRudNbao3VWoaWT'),
+('9Ryxq5cw7SKg877JTB5dY4tFfPtSRMJcKcUbx2Lwy3fA'),
+('GBq2dRSikNna4BAco1hnT95jPvPpF7N71Ly5tqC5eavP'),
+('Dcd3xQ91CbWRv9j5SAobt4tQ59VjaBkFGnpnfpmjU9RF'),
+('BBD9UPU6QMGGRby97TQ1HEEoE1PGfKZJehgmb7voGF9X'),
+('C5f2bjyQG12kmCFD5oR34kkuxLcrSxPpbrLYVZiUKLei'),
+('DjqZegEA5kMx5TEfTSAoY4EVd8jrHqZ2pKebUfrFZMiL'),
+('85qejbH7C38mBzSR6AmdeTnaFuLbR8c7e3DkTQ7UMqvJ'),
+('8JPcGyGV23cGwNUym8vndnTNjvmR1poxskkP3ZBAfptH'),
+('3Rcv6hGNrKS6n5ecGRx6zHT72aQaVDq6r4J1V34jfBG6'),
+('25KzBHu65tEEookwYng3jPFvnfVYVD1LNPXrMiaeLiSj'),
+('J3qYz1foDTm3EWLKYE1EEmyvcnaYskjJAhjZk8Q9Nhie'),
+('Fv4GRFGUNCpcGSpdUpmfBjYmhXBG9x25papj5YvZDG9L'),
+('D5VmaMsFvEE6DhKvF74VNypvNdB4gycvWLXAk36cszhA'),
+('3J74hx3WttvZL3qJBfu3q8aMbuZFQ2V7g3js9ENtojkq'),
+('EU84rx2n7J4haAQq1qq3D5Ue1oHSzrWjPhQ1UeX16uTE'),
+('DiLjGyD93hbBtMuRSCtzpWJaeRbVSQvBviGAEeDhaw9f'),
+('715NwjtjrJuczMdn6pakYLKgBLjoM4fkxC4JShjuYTsJ'),
+('292Njce8xihiqZkUJAryq3iuF1E53pykEaYZFKxtA7wp'),
+('GWyV5pYJcoTVdsDwJgeCxMNMUJE5DRVeam6YpcNnrrra'),
+('38Xuto1h6SdU6nrLzAC4A5aAirUbYBbQYoU3GpA1cFAd'),
+('6b7bFDkUFpe5gh1wr1wAiBcXcVAzQ1vHX8Jqd37k2rHA'),
+('YDNjuYCtUNjs7ySZGN5cB3i66fZXbvNz2EDVQhebjrb'),
+('EPdAS9kMPw1HU2tkCaNUNxgbRFp3wyU7T6fBf7kfiQRs'),
+('CdxFrC9TqG2NL68bqdMhHWXQ2z92mdTvj7U2DXmrDRZb'),
+('3g5c7jhgJZj3xpkCPKDpDG7GZjzdGdocMkteaedpefY5'),
+('HmCcFxg21fq1e9412S7JWjJcv35ydqqvzEY7pADmDW6z'),
+('8iUemcWGe4VXHiVfdu4CPzkesMMdDWNaGjRSBV5z4Gv1'),
+('EfaNjFKiJ4fibyEuUK5mvYz8Pq3mJHuvX4SvkchNRGtE'),
+('Gkdipg6Fgg1qpBcRB2tugAgJTABUWy7FaTwN8JvJH5Sq'),
+('JoHUL96hTwjmt3J3ej5Gh6ccXWAxYtRQQ9W7oThrYQi'),
+('4Lz7T23QFyxKhjJSjYiwyKMXpoTsnSD9Y2ebFfAyYJrW'),
+('JoHUL96hTwjmt3J3ej5Gh6ccXWAxYtRQQ9W7oThrYQi'),
+('4wDdJNhvkeVniNAmsHKVm7JkLrDYfK617rd1XSVX1tqT'),
+('5TNPQQxiDw64b7LdngTg6mgTpsmxWiWebzsNGV3MJjoe'),
+('FRS1vxwd7LtDwpYCDMToz8ZWhzVsfEfyo71dvoveBP2t'),
+('3UUuoUJxgwzBb9SJu97LcBmC9tdRnCGt7qg1tzHY7JXi'),
+('DPDsxSiR5HEq3BT4CwfNXnVCqqgEKAC3MnuhPW2dzujd'),
+('7xiwqf9zTs4BqaDDXXifyrYj7Eae2gjWYfpTdVkrH13n'),
+('G1iY2JXWmWZnLDpjTZmFYP1KtLJgTrfw2WFifTPhnEpb'),
+('6TxW4rKSrUQN2vnjKWC9vE1xstXbqyqHXn27k8591YmD'),
+('EZzAFQQHc6DoKmgxJ6a5FHjUujzqj8dwiu4EusH8m9Wt'),
+('dhkL8ppptiaRPYgbhfMk5u61yHVran3yET5QVShALph'),
+('7GeLzpaKgWguhSdzKXUxhZJN19X9TsVDegGJewfjzCuF'),
+('5SYnefTXzKTbHLcz4LbbhatuJJKaJcQhAsWmNvTmrdvY'),
+('FWt99Ceq8MZ6tsQNnqqYHVedEp98LCnZQsh6gvMU6byx'),
+('CxUaTyKrJYX7cyi9kbBdNUdhjLBT1A2baJnN5J5zozkF'),
+('2aD3vukDktzTzNc2m84trz3P74jmiktcV4h3YC2S6ugW'),
+('BnPck9RGdhvgQuB3sK15cJYZY3cfc8nRjwjNQ46CN4CH'),
+('7AN7dw4BHHrWdy5TqQJtasNeoMH35C87kbJdwPghxDek'),
+('DapojzQTe6yVd34xZiNmXz1CBcgx6UJWagU8Fm42L3L8'),
+('J6285GUWnbt8EMa6aap5m6oodqtvbpZB9o7J1ZdfRYtr'),
+('3Ruxys49v99VFTLnhce7boszyKuowL4aFpRsMvBrKJSY'),
+('4KkgCijaNgepP1PjvunguT4SYqSXGV3cAA9iNuVZxGUa'),
+('98FC8ZPQJRRPHXEGgi79Y2RBZbAiAACWs66GqakbYURd'),
+('H2fzZX8bGhWxgZRWcBFf2Xfj7ffK5cGRFE5ucwKJkuaV'),
+('C39vL9bXZpf9ijLXsaYavxtmVtUH9gKHaGX7QkL2RpsT'),
+('6uhaqbixrnHtSALAAzEmemxUgy8W7ALEJWzVLSjzSZNS'),
+('CX4crvysdQommJFaucxrWWFiM2boP2oUsk8Dx6MV2nbH'),
+('4WMgmAiWzZjkrTuzw9taNx3A5xKmY8H31Ksn1f2cGrgD'),
+('EuWjbGDemUGbpiLSdM3oZVVHKhE3pLuisVDATxBH4WVv'),
+('HciiyMRR91k75W2B4WaZBtqM6pN2MuLtGrEvnKuWjvpm'),
+('GPibG13NW8gPjNy3QfBe7MwrVj3EAbfQwCwen5y6GBVF'),
+('Ejqrcp9bNeQXKUu9RnZ5FTTurDdZMPycvkSMpnFx41RD'),
+('Eo7jXLYAwN4mbTEKSFUN5kS8J1uNUieE9EGQ7zpNKMXC'),
+('GgsFVKsAjUssCra7CJSQL1mUrkNhkUVhRAhFw4aTK2Js'),
+('cmzpbTpnnXPAnC1eoYh1YgyyHu42yFYidNpfGmcc9iY'),
+('HMQ3N6gR2Z88PQAvuNoHZ4sSsT1oBAhBcSS9x82yA9QT'),
+('AFgojJr8BAQPTkVY6SKKVSbqe2KscygAEDFM85CMUiXQ'),
+('5ZqEbaZALW1Eqjsmb3BC9QW19HnEVMLFdXQatX5dGRJ9'),
+('8Atj1WQhgyobZ3w66zoH6xTcs3xsvpUWA3LngRxmqVyB'),
+('3DFHqocwBzGiEUifxjuahjP3ix7FaTbrDxDphUSUiPfW'),
+('99BSnTMH5PzkWT7twzyG3P53hvHjqBi9uGoPEWmQMp6k'),
+('4wDdJNhvkeVniNAmsHKVm7JkLrDYfK617rd1XSVX1tqT'),
+('5TNPQQxiDw64b7LdngTg6mgTpsmxWiWebzsNGV3MJjoe'),
+('FRS1vxwd7LtDwpYCDMToz8ZWhzVsfEfyo71dvoveBP2t'),
+('3UUuoUJxgwzBb9SJu97LcBmC9tdRnCGt7qg1tzHY7JXi'),
+('DPDsxSiR5HEq3BT4CwfNXnVCqqgEKAC3MnuhPW2dzujd'),
+('7xiwqf9zTs4BqaDDXXifyrYj7Eae2gjWYfpTdVkrH13n'),
+('G1iY2JXWmWZnLDpjTZmFYP1KtLJgTrfw2WFifTPhnEpb'),
+('6TxW4rKSrUQN2vnjKWC9vE1xstXbqyqHXn27k8591YmD'),
+('EZzAFQQHc6DoKmgxJ6a5FHjUujzqj8dwiu4EusH8m9Wt'),
+('dhkL8ppptiaRPYgbhfMk5u61yHVran3yET5QVShALph'),
+('7GeLzpaKgWguhSdzKXUxhZJN19X9TsVDegGJewfjzCuF'),
+('5SYnefTXzKTbHLcz4LbbhatuJJKaJcQhAsWmNvTmrdvY'),
+('FWt99Ceq8MZ6tsQNnqqYHVedEp98LCnZQsh6gvMU6byx'),
+('CxUaTyKrJYX7cyi9kbBdNUdhjLBT1A2baJnN5J5zozkF'),
+('2aD3vukDktzTzNc2m84trz3P74jmiktcV4h3YC2S6ugW'),
+('BnPck9RGdhvgQuB3sK15cJYZY3cfc8nRjwjNQ46CN4CH'),
+('7AN7dw4BHHrWdy5TqQJtasNeoMH35C87kbJdwPghxDek'),
+('DapojzQTe6yVd34xZiNmXz1CBcgx6UJWagU8Fm42L3L8'),
+('J6285GUWnbt8EMa6aap5m6oodqtvbpZB9o7J1ZdfRYtr'),
+('3Ruxys49v99VFTLnhce7boszyKuowL4aFpRsMvBrKJSY'),
+('4KkgCijaNgepP1PjvunguT4SYqSXGV3cAA9iNuVZxGUa'),
+('98FC8ZPQJRRPHXEGgi79Y2RBZbAiAACWs66GqakbYURd'),
+('H2fzZX8bGhWxgZRWcBFf2Xfj7ffK5cGRFE5ucwKJkuaV'),
+('C39vL9bXZpf9ijLXsaYavxtmVtUH9gKHaGX7QkL2RpsT'),
+('6uhaqbixrnHtSALAAzEmemxUgy8W7ALEJWzVLSjzSZNS'),
+('CX4crvysdQommJFaucxrWWFiM2boP2oUsk8Dx6MV2nbH'),
+('4WMgmAiWzZjkrTuzw9taNx3A5xKmY8H31Ksn1f2cGrgD'),
+('EuWjbGDemUGbpiLSdM3oZVVHKhE3pLuisVDATxBH4WVv'),
+('HciiyMRR91k75W2B4WaZBtqM6pN2MuLtGrEvnKuWjvpm'),
+('GPibG13NW8gPjNy3QfBe7MwrVj3EAbfQwCwen5y6GBVF'),
+('Ejqrcp9bNeQXKUu9RnZ5FTTurDdZMPycvkSMpnFx41RD'),
+('Eo7jXLYAwN4mbTEKSFUN5kS8J1uNUieE9EGQ7zpNKMXC'),
+('GgsFVKsAjUssCra7CJSQL1mUrkNhkUVhRAhFw4aTK2Js'),
+('cmzpbTpnnXPAnC1eoYh1YgyyHu42yFYidNpfGmcc9iY'),
+('HMQ3N6gR2Z88PQAvuNoHZ4sSsT1oBAhBcSS9x82yA9QT'),
+('AFgojJr8BAQPTkVY6SKKVSbqe2KscygAEDFM85CMUiXQ'),
+('5ZqEbaZALW1Eqjsmb3BC9QW19HnEVMLFdXQatX5dGRJ9'),
+('8Atj1WQhgyobZ3w66zoH6xTcs3xsvpUWA3LngRxmqVyB'),
+('3DFHqocwBzGiEUifxjuahjP3ix7FaTbrDxDphUSUiPfW'),
+('99BSnTMH5PzkWT7twzyG3P53hvHjqBi9uGoPEWmQMp6k'),
+('GgrqdakVrYZf1JHBHsuQpDMcmwn6FWr6MMQXXBqJYQtp'),
+('2b8Ezd7wr5aNHi5qLXfsUrJ9RNSEFSjGHHvh3G6rXY4q'),
+('CdSkZkYzcnpZw4155uUE6JVpXeek4KTVfh9bMGmUuxfR'),
+('4eHQQfi3QAjT1WrWGChkbBFVJDimL3Hyav9cMxarD2V7'),
+('9ZBohEqufkurQspWfbDLoLBBWfTd9HhzzP1Doz26DtrW'),
+('7dawRxqwqQcwWaEjXqc1F5JCrsoHV5G9TREQYriD7fSD'),
+('Goa18tkpJPAZhAmajcCtpW3NaPs2Vf7Uqfg1hWQmciAw'),
+('Ho6fHBKRYYWs6zXQvUWJAea92fDKy72z4Tv541dFS973')
+    ) AS provided_list(wallet_address)
+),
+
+Level1Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM InitialList)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+          AND to_owner NOT IN ('d1Cphwh9L82AfJGjWAScFiaW7CedWyjUm9VwsTcmVY4',
+'5uQ8CmC5LNJuooqxiumnXfS5t7yJV3R842y5HYVbtHZE',
+'5QypxFUwXawAwd3quV8jHJgM6kqZkSgiwqm6nHiwDkny',
+'2akAoZR7b7uGnZrweMAa8v8XzrDnDobNkyKRkfWFWB51',
+'3CdN6VVQPr6mZ4Jq6pEVBV16YqLtt5m4dtWMRbGUZX12',
+'93mCspuX7yWVSiGkLLsWZjsro1PELKwpy5LzaWuh4uLf',
+'AE3V3EfMK5wj5C1sxKcCmf2pCpxxpxY75vB69azWTgeP',
+'2fnvwc5RrhjYTpGYfYhzSdNoCMsviUQHoqZbxn7B4V55',
+'8PZNvNAXexKfWo3skQWd5PiBFahuNADS4EuYFw7Zbc4f',
+'DTRuGdZvH6HEJz5XkyRVXVrbdPW4QL1GqvhqXKZ3XuSn')
+),
+
+Level2Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM Level1Outflow)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+          AND to_owner NOT IN ('d1Cphwh9L82AfJGjWAScFiaW7CedWyjUm9VwsTcmVY4',
+'5uQ8CmC5LNJuooqxiumnXfS5t7yJV3R842y5HYVbtHZE',
+'5QypxFUwXawAwd3quV8jHJgM6kqZkSgiwqm6nHiwDkny',
+'2akAoZR7b7uGnZrweMAa8v8XzrDnDobNkyKRkfWFWB51',
+'3CdN6VVQPr6mZ4Jq6pEVBV16YqLtt5m4dtWMRbGUZX12',
+'93mCspuX7yWVSiGkLLsWZjsro1PELKwpy5LzaWuh4uLf',
+'AE3V3EfMK5wj5C1sxKcCmf2pCpxxpxY75vB69azWTgeP',
+'2fnvwc5RrhjYTpGYfYhzSdNoCMsviUQHoqZbxn7B4V55',
+'8PZNvNAXexKfWo3skQWd5PiBFahuNADS4EuYFw7Zbc4f',
+'DTRuGdZvH6HEJz5XkyRVXVrbdPW4QL1GqvhqXKZ3XuSn')
+),
+
+Level3Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM Level2Outflow)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+          AND to_owner NOT IN ('d1Cphwh9L82AfJGjWAScFiaW7CedWyjUm9VwsTcmVY4',
+'5uQ8CmC5LNJuooqxiumnXfS5t7yJV3R842y5HYVbtHZE',
+'5QypxFUwXawAwd3quV8jHJgM6kqZkSgiwqm6nHiwDkny',
+'2akAoZR7b7uGnZrweMAa8v8XzrDnDobNkyKRkfWFWB51',
+'3CdN6VVQPr6mZ4Jq6pEVBV16YqLtt5m4dtWMRbGUZX12',
+'93mCspuX7yWVSiGkLLsWZjsro1PELKwpy5LzaWuh4uLf',
+'AE3V3EfMK5wj5C1sxKcCmf2pCpxxpxY75vB69azWTgeP',
+'2fnvwc5RrhjYTpGYfYhzSdNoCMsviUQHoqZbxn7B4V55',
+'8PZNvNAXexKfWo3skQWd5PiBFahuNADS4EuYFw7Zbc4f',
+'DTRuGdZvH6HEJz5XkyRVXVrbdPW4QL1GqvhqXKZ3XuSn')
+),
+
+Level4Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM Level3Outflow)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+          AND to_owner NOT IN ('d1Cphwh9L82AfJGjWAScFiaW7CedWyjUm9VwsTcmVY4',
+'5uQ8CmC5LNJuooqxiumnXfS5t7yJV3R842y5HYVbtHZE',
+'5QypxFUwXawAwd3quV8jHJgM6kqZkSgiwqm6nHiwDkny',
+'2akAoZR7b7uGnZrweMAa8v8XzrDnDobNkyKRkfWFWB51',
+'3CdN6VVQPr6mZ4Jq6pEVBV16YqLtt5m4dtWMRbGUZX12',
+'93mCspuX7yWVSiGkLLsWZjsro1PELKwpy5LzaWuh4uLf',
+'AE3V3EfMK5wj5C1sxKcCmf2pCpxxpxY75vB69azWTgeP',
+'2fnvwc5RrhjYTpGYfYhzSdNoCMsviUQHoqZbxn7B4V55',
+'8PZNvNAXexKfWo3skQWd5PiBFahuNADS4EuYFw7Zbc4f',
+'DTRuGdZvH6HEJz5XkyRVXVrbdPW4QL1GqvhqXKZ3XuSn')
+),
+CombinedWallets AS (
+    SELECT wallet_address FROM InitialList
+    UNION DISTINCT
+    SELECT wallet_address FROM Level1Outflow
+    UNION DISTINCT
+    SELECT wallet_address FROM Level2Outflow
+    UNION DISTINCT
+    SELECT wallet_address FROM Level3Outflow
+     UNION DISTINCT
+    SELECT wallet_address FROM Level4Outflow
+)
+
+
+
+SELECT
+    wallet_address
+
+FROM
+   CombinedWallets
+

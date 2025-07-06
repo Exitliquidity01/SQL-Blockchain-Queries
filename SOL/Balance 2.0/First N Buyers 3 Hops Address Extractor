@@ -1,0 +1,253 @@
+WITH MintingAddresses AS (
+    SELECT
+        to_owner AS wallet_address
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+), 
+
+TotalSupply AS (
+    SELECT
+       amount / POW(10, {{decimals}}) AS total_supply
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+    ORDER BY block_time ASC
+    LIMIT 1 
+),
+
+InitialTransfers AS (
+    SELECT 
+        DISTINCT trader_id AS wallet_address,
+        MIN(block_time) AS first_purchase_time
+    FROM
+        dex_solana.trades
+    WHERE
+        token_bought_mint_address = '{{token}}'
+        AND trader_id NOT IN (SELECT wallet_address FROM MintingAddresses)
+         AND trader_id NOT IN (('GGztQqQ6pCPaJQnNpXBgELr5cs3WwDakRbh1iEMzjgSJ'),
+('CapuXNQoDviLvU1PxFiizLgPNQCxrsag1uMeyk6zLVps'),
+('6U91aKa8pmMxkJwBCfPTmUEfZi6dHe7DcFq2ALvB2tbB'),
+('4xDsmeTWPNjgSVSS1VTfzFq3iHZhp77ffPkAmkZkdu71'),
+('6LXutJvKUw8Q5ue2gCgKHQdAN4suWW8awzFVC6XCguFx'),
+('2MFoS3MPtvyQ4Wh4M9pdfPjz6UhVoNbFbGJAskCPCj3h'),
+('9nnLbotNTcUhvbrsA6Mdkx45Sm82G35zo28AqUvjExn8'),
+('BQ72nSv9f3PRyRKCBnHLVrerrv37CYTHm5h3s9VSGQDV'),
+('DSN3j1ykL3obAVNv7ZX49VsFCPe4LqzxHnmtLiPwY6xg'),
+('69yhtoJR4JYPPABZcSNkzuqbaFbwHsCkja1sP1Q2aVT5'),
+('3LoAYHuSd7Gh8d7RTFnhvYtiTiefdZ5ByamU42vkzd76'),
+('HFqp6ErWHY6Uzhj8rFyjYuDya2mXUpYEk8VW75K9PSiY'),
+('7iWnBRRhBCiNXXPhqiGzvvBkKrvFSWqqmxRyu9VyYBxE'),
+('HU23r7UoZbqTUuh3vA7emAGztFtqwTeVips789vqxxBw'),
+('GP8StUXNYSZjPikyRsvkTbvRV1GBxMErb59cpeCJnDf1'),
+('3CgvbiM3op4vjrrjH2zcrQUwsqh5veNVRjFCB9N6sRoD'),
+('45ruCyfdRkWpRNGEqWzjCiXRHkZs8WXCLQ67Pnpye7Hp'),
+('DCAK36VfExkPdAkYUQg6ewgxyinvcEyPLyHjRbmveKFw'),
+('DCAKxn5PFNN1mBREPWGdk1RXg5aVH9rPErLfBFEi2Emb'),
+('DCAKuApAuZtVNYLk3KTAVW9GLWVvPbnb5CxxRRmVgcTr'),
+('ZG98FUCjb8mJ824Gbs6RsgVmr1FhXb2oNiJHa2dwmPd'),
+('JD1dHSqYkrXvqUVL8s6gzL1yB7kpYymsHfwsGxgwp55h'),
+('JD25qVdtd65FoiXNmR89JjmoJdYk9sjYQeSTZAALFiMy'),
+('JD38n7ynKYcgPpF7k1BhXEeREu1KqptU93fVGy3S624k'),
+('EfFP8PtydAAKsGJCh8pkAwXcz27XXoF7i578jFaw6yLL'),
+('DpZLGcMkfi79NevqsbAn337wwL5rRdDsNQ1YNzsaMwkd'),
+('NeZtX6E6ocyuC5MQ4YmAp2zXCLD8WKfJjKj8WtcBamW'),
+('EcD2FhiPzhT8jQWP6t3usiN9K8NKc5ELWBZekAU6wGno'),
+('7e3npUHXkdA3wBHY2sdU314DXPHFJTDbRwRyhqvtgiDk'),
+('CBMMCpnktHyA2keVXe3pfZsevnAKRgCwV7VW25QgJwCY'),
+('2yhJhGncpxBrw3FDFD1BNaPw6MiBkc7xyt31uUAP2Fku'),
+('CpoD6tWAsMDeyvVG2q2rD1JbDY6d4AujnvAn2NdrhZV2'),
+('4eb4n3xzYLGaYgZ1wxZsvnpZS7WVYjU7E6pwayxsUGB8'),
+('EfU6ZTnKqT3DdV9H2HZS5bnU7BJLRyvmCoyw7dFn3JfK'),
+('7ti77iFqKbFvEtmgzdobwYxSDNcfnkEwFtv5RUzpiKbc'),
+('K89C5ELTX98KiKET8PQCqe15NzogVgo9QqixYtuH4ok'),
+('4S8dzq47snXPFbEccXPKzYUMnF9vEm9LvmkgVi7EQ91T'),
+('4u5Em3rEE6pX1XccbVS1EKfaVEFeHBFkqGSPZ7kZk9YB'),
+('3iRuAXnhtuLEfSpFN66EZHoZsVy47eySFvVxB1JeyupF'),
+('8RyWnmGcK2hBbCbMBvrquzs5DBbEeWF13F63nGNMHeYG'),
+('4zALRoZxLQPcRsjMTsmVUttkdqtARFdyLwqKeLFmH5dH'),
+('3eGdjMdQqFUNc4G64BZb7YCALDEaturLUWcixjJfKxEh'))
+
+    GROUP BY trader_id
+    ORDER BY first_purchase_time ASC
+    LIMIT {{N_buyers}}
+),
+
+   Level1Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM InitialTransfers)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+          AND to_owner NOT IN (('GGztQqQ6pCPaJQnNpXBgELr5cs3WwDakRbh1iEMzjgSJ'),
+('CapuXNQoDviLvU1PxFiizLgPNQCxrsag1uMeyk6zLVps'),
+('6U91aKa8pmMxkJwBCfPTmUEfZi6dHe7DcFq2ALvB2tbB'),
+('4xDsmeTWPNjgSVSS1VTfzFq3iHZhp77ffPkAmkZkdu71'),
+('6LXutJvKUw8Q5ue2gCgKHQdAN4suWW8awzFVC6XCguFx'),
+('2MFoS3MPtvyQ4Wh4M9pdfPjz6UhVoNbFbGJAskCPCj3h'),
+('9nnLbotNTcUhvbrsA6Mdkx45Sm82G35zo28AqUvjExn8'),
+('BQ72nSv9f3PRyRKCBnHLVrerrv37CYTHm5h3s9VSGQDV'),
+('DSN3j1ykL3obAVNv7ZX49VsFCPe4LqzxHnmtLiPwY6xg'),
+('69yhtoJR4JYPPABZcSNkzuqbaFbwHsCkja1sP1Q2aVT5'),
+('3LoAYHuSd7Gh8d7RTFnhvYtiTiefdZ5ByamU42vkzd76'),
+('HFqp6ErWHY6Uzhj8rFyjYuDya2mXUpYEk8VW75K9PSiY'),
+('7iWnBRRhBCiNXXPhqiGzvvBkKrvFSWqqmxRyu9VyYBxE'),
+('HU23r7UoZbqTUuh3vA7emAGztFtqwTeVips789vqxxBw'),
+('GP8StUXNYSZjPikyRsvkTbvRV1GBxMErb59cpeCJnDf1'),
+('3CgvbiM3op4vjrrjH2zcrQUwsqh5veNVRjFCB9N6sRoD'),
+('45ruCyfdRkWpRNGEqWzjCiXRHkZs8WXCLQ67Pnpye7Hp'),
+('DCAK36VfExkPdAkYUQg6ewgxyinvcEyPLyHjRbmveKFw'),
+('DCAKxn5PFNN1mBREPWGdk1RXg5aVH9rPErLfBFEi2Emb'),
+('DCAKuApAuZtVNYLk3KTAVW9GLWVvPbnb5CxxRRmVgcTr'),
+('ZG98FUCjb8mJ824Gbs6RsgVmr1FhXb2oNiJHa2dwmPd'),
+('JD1dHSqYkrXvqUVL8s6gzL1yB7kpYymsHfwsGxgwp55h'),
+('JD25qVdtd65FoiXNmR89JjmoJdYk9sjYQeSTZAALFiMy'),
+('JD38n7ynKYcgPpF7k1BhXEeREu1KqptU93fVGy3S624k'),
+('EfFP8PtydAAKsGJCh8pkAwXcz27XXoF7i578jFaw6yLL'),
+('DpZLGcMkfi79NevqsbAn337wwL5rRdDsNQ1YNzsaMwkd'),
+('NeZtX6E6ocyuC5MQ4YmAp2zXCLD8WKfJjKj8WtcBamW'),
+('EcD2FhiPzhT8jQWP6t3usiN9K8NKc5ELWBZekAU6wGno'),
+('7e3npUHXkdA3wBHY2sdU314DXPHFJTDbRwRyhqvtgiDk'),
+('CBMMCpnktHyA2keVXe3pfZsevnAKRgCwV7VW25QgJwCY'),
+('2yhJhGncpxBrw3FDFD1BNaPw6MiBkc7xyt31uUAP2Fku'),
+('CpoD6tWAsMDeyvVG2q2rD1JbDY6d4AujnvAn2NdrhZV2'),
+('4eb4n3xzYLGaYgZ1wxZsvnpZS7WVYjU7E6pwayxsUGB8'),
+('EfU6ZTnKqT3DdV9H2HZS5bnU7BJLRyvmCoyw7dFn3JfK'),
+('7ti77iFqKbFvEtmgzdobwYxSDNcfnkEwFtv5RUzpiKbc'),
+('K89C5ELTX98KiKET8PQCqe15NzogVgo9QqixYtuH4ok'),
+('4S8dzq47snXPFbEccXPKzYUMnF9vEm9LvmkgVi7EQ91T'),
+('4u5Em3rEE6pX1XccbVS1EKfaVEFeHBFkqGSPZ7kZk9YB'),
+('3iRuAXnhtuLEfSpFN66EZHoZsVy47eySFvVxB1JeyupF'),
+('8RyWnmGcK2hBbCbMBvrquzs5DBbEeWF13F63nGNMHeYG'),
+('4zALRoZxLQPcRsjMTsmVUttkdqtARFdyLwqKeLFmH5dH'),
+('3eGdjMdQqFUNc4G64BZb7YCALDEaturLUWcixjJfKxEh'))
+),
+
+Level2Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM Level1Outflow)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+          AND to_owner NOT IN (('GGztQqQ6pCPaJQnNpXBgELr5cs3WwDakRbh1iEMzjgSJ'),
+('CapuXNQoDviLvU1PxFiizLgPNQCxrsag1uMeyk6zLVps'),
+('6U91aKa8pmMxkJwBCfPTmUEfZi6dHe7DcFq2ALvB2tbB'),
+('4xDsmeTWPNjgSVSS1VTfzFq3iHZhp77ffPkAmkZkdu71'),
+('6LXutJvKUw8Q5ue2gCgKHQdAN4suWW8awzFVC6XCguFx'),
+('2MFoS3MPtvyQ4Wh4M9pdfPjz6UhVoNbFbGJAskCPCj3h'),
+('9nnLbotNTcUhvbrsA6Mdkx45Sm82G35zo28AqUvjExn8'),
+('BQ72nSv9f3PRyRKCBnHLVrerrv37CYTHm5h3s9VSGQDV'),
+('DSN3j1ykL3obAVNv7ZX49VsFCPe4LqzxHnmtLiPwY6xg'),
+('69yhtoJR4JYPPABZcSNkzuqbaFbwHsCkja1sP1Q2aVT5'),
+('3LoAYHuSd7Gh8d7RTFnhvYtiTiefdZ5ByamU42vkzd76'),
+('HFqp6ErWHY6Uzhj8rFyjYuDya2mXUpYEk8VW75K9PSiY'),
+('7iWnBRRhBCiNXXPhqiGzvvBkKrvFSWqqmxRyu9VyYBxE'),
+('HU23r7UoZbqTUuh3vA7emAGztFtqwTeVips789vqxxBw'),
+('GP8StUXNYSZjPikyRsvkTbvRV1GBxMErb59cpeCJnDf1'),
+('3CgvbiM3op4vjrrjH2zcrQUwsqh5veNVRjFCB9N6sRoD'),
+('45ruCyfdRkWpRNGEqWzjCiXRHkZs8WXCLQ67Pnpye7Hp'),
+('DCAK36VfExkPdAkYUQg6ewgxyinvcEyPLyHjRbmveKFw'),
+('DCAKxn5PFNN1mBREPWGdk1RXg5aVH9rPErLfBFEi2Emb'),
+('DCAKuApAuZtVNYLk3KTAVW9GLWVvPbnb5CxxRRmVgcTr'),
+('ZG98FUCjb8mJ824Gbs6RsgVmr1FhXb2oNiJHa2dwmPd'),
+('JD1dHSqYkrXvqUVL8s6gzL1yB7kpYymsHfwsGxgwp55h'),
+('JD25qVdtd65FoiXNmR89JjmoJdYk9sjYQeSTZAALFiMy'),
+('JD38n7ynKYcgPpF7k1BhXEeREu1KqptU93fVGy3S624k'),
+('EfFP8PtydAAKsGJCh8pkAwXcz27XXoF7i578jFaw6yLL'),
+('DpZLGcMkfi79NevqsbAn337wwL5rRdDsNQ1YNzsaMwkd'),
+('NeZtX6E6ocyuC5MQ4YmAp2zXCLD8WKfJjKj8WtcBamW'),
+('EcD2FhiPzhT8jQWP6t3usiN9K8NKc5ELWBZekAU6wGno'),
+('7e3npUHXkdA3wBHY2sdU314DXPHFJTDbRwRyhqvtgiDk'),
+('CBMMCpnktHyA2keVXe3pfZsevnAKRgCwV7VW25QgJwCY'),
+('2yhJhGncpxBrw3FDFD1BNaPw6MiBkc7xyt31uUAP2Fku'),
+('CpoD6tWAsMDeyvVG2q2rD1JbDY6d4AujnvAn2NdrhZV2'),
+('4eb4n3xzYLGaYgZ1wxZsvnpZS7WVYjU7E6pwayxsUGB8'),
+('EfU6ZTnKqT3DdV9H2HZS5bnU7BJLRyvmCoyw7dFn3JfK'),
+('7ti77iFqKbFvEtmgzdobwYxSDNcfnkEwFtv5RUzpiKbc'),
+('K89C5ELTX98KiKET8PQCqe15NzogVgo9QqixYtuH4ok'),
+('4S8dzq47snXPFbEccXPKzYUMnF9vEm9LvmkgVi7EQ91T'),
+('4u5Em3rEE6pX1XccbVS1EKfaVEFeHBFkqGSPZ7kZk9YB'),
+('3iRuAXnhtuLEfSpFN66EZHoZsVy47eySFvVxB1JeyupF'),
+('8RyWnmGcK2hBbCbMBvrquzs5DBbEeWF13F63nGNMHeYG'),
+('4zALRoZxLQPcRsjMTsmVUttkdqtARFdyLwqKeLFmH5dH'),
+('3eGdjMdQqFUNc4G64BZb7YCALDEaturLUWcixjJfKxEh'))
+
+
+),
+
+Level3Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM Level2Outflow)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+          AND to_owner NOT IN (('GGztQqQ6pCPaJQnNpXBgELr5cs3WwDakRbh1iEMzjgSJ'),
+('CapuXNQoDviLvU1PxFiizLgPNQCxrsag1uMeyk6zLVps'),
+('6U91aKa8pmMxkJwBCfPTmUEfZi6dHe7DcFq2ALvB2tbB'),
+('4xDsmeTWPNjgSVSS1VTfzFq3iHZhp77ffPkAmkZkdu71'),
+('6LXutJvKUw8Q5ue2gCgKHQdAN4suWW8awzFVC6XCguFx'),
+('2MFoS3MPtvyQ4Wh4M9pdfPjz6UhVoNbFbGJAskCPCj3h'),
+('9nnLbotNTcUhvbrsA6Mdkx45Sm82G35zo28AqUvjExn8'),
+('BQ72nSv9f3PRyRKCBnHLVrerrv37CYTHm5h3s9VSGQDV'),
+('DSN3j1ykL3obAVNv7ZX49VsFCPe4LqzxHnmtLiPwY6xg'),
+('69yhtoJR4JYPPABZcSNkzuqbaFbwHsCkja1sP1Q2aVT5'),
+('3LoAYHuSd7Gh8d7RTFnhvYtiTiefdZ5ByamU42vkzd76'),
+('HFqp6ErWHY6Uzhj8rFyjYuDya2mXUpYEk8VW75K9PSiY'),
+('7iWnBRRhBCiNXXPhqiGzvvBkKrvFSWqqmxRyu9VyYBxE'),
+('HU23r7UoZbqTUuh3vA7emAGztFtqwTeVips789vqxxBw'),
+('GP8StUXNYSZjPikyRsvkTbvRV1GBxMErb59cpeCJnDf1'),
+('3CgvbiM3op4vjrrjH2zcrQUwsqh5veNVRjFCB9N6sRoD'),
+('45ruCyfdRkWpRNGEqWzjCiXRHkZs8WXCLQ67Pnpye7Hp'),
+('DCAK36VfExkPdAkYUQg6ewgxyinvcEyPLyHjRbmveKFw'),
+('DCAKxn5PFNN1mBREPWGdk1RXg5aVH9rPErLfBFEi2Emb'),
+('DCAKuApAuZtVNYLk3KTAVW9GLWVvPbnb5CxxRRmVgcTr'),
+('ZG98FUCjb8mJ824Gbs6RsgVmr1FhXb2oNiJHa2dwmPd'),
+('JD1dHSqYkrXvqUVL8s6gzL1yB7kpYymsHfwsGxgwp55h'),
+('JD25qVdtd65FoiXNmR89JjmoJdYk9sjYQeSTZAALFiMy'),
+('JD38n7ynKYcgPpF7k1BhXEeREu1KqptU93fVGy3S624k'),
+('EfFP8PtydAAKsGJCh8pkAwXcz27XXoF7i578jFaw6yLL'),
+('DpZLGcMkfi79NevqsbAn337wwL5rRdDsNQ1YNzsaMwkd'),
+('NeZtX6E6ocyuC5MQ4YmAp2zXCLD8WKfJjKj8WtcBamW'),
+('EcD2FhiPzhT8jQWP6t3usiN9K8NKc5ELWBZekAU6wGno'),
+('7e3npUHXkdA3wBHY2sdU314DXPHFJTDbRwRyhqvtgiDk'),
+('CBMMCpnktHyA2keVXe3pfZsevnAKRgCwV7VW25QgJwCY'),
+('2yhJhGncpxBrw3FDFD1BNaPw6MiBkc7xyt31uUAP2Fku'),
+('CpoD6tWAsMDeyvVG2q2rD1JbDY6d4AujnvAn2NdrhZV2'),
+('4eb4n3xzYLGaYgZ1wxZsvnpZS7WVYjU7E6pwayxsUGB8'),
+('EfU6ZTnKqT3DdV9H2HZS5bnU7BJLRyvmCoyw7dFn3JfK'),
+('7ti77iFqKbFvEtmgzdobwYxSDNcfnkEwFtv5RUzpiKbc'),
+('K89C5ELTX98KiKET8PQCqe15NzogVgo9QqixYtuH4ok'),
+('4S8dzq47snXPFbEccXPKzYUMnF9vEm9LvmkgVi7EQ91T'),
+('4u5Em3rEE6pX1XccbVS1EKfaVEFeHBFkqGSPZ7kZk9YB'),
+('3iRuAXnhtuLEfSpFN66EZHoZsVy47eySFvVxB1JeyupF'),
+('8RyWnmGcK2hBbCbMBvrquzs5DBbEeWF13F63nGNMHeYG'),
+('4zALRoZxLQPcRsjMTsmVUttkdqtARFdyLwqKeLFmH5dH'),
+('3eGdjMdQqFUNc4G64BZb7YCALDEaturLUWcixjJfKxEh'))
+
+
+),
+
+CombinedWallets AS (
+    SELECT wallet_address FROM InitialTransfers
+    UNION DISTINCT
+    SELECT wallet_address FROM Level1Outflow
+     UNION DISTINCT
+    SELECT wallet_address FROM Level2Outflow
+      UNION DISTINCT
+    SELECT wallet_address FROM Level3Outflow
+
+
+   
+)
+
+
+
+SELECT
+    wallet_address
+
+FROM
+   CombinedWallets

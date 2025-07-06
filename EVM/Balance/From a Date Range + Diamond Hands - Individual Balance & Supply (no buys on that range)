@@ -1,0 +1,108 @@
+WITH total_supply AS (
+ 
+    SELECT 
+        value / POW(10, {{decimals}}) AS supply
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+    ORDER BY 
+        evt_block_time ASC
+    LIMIT 1
+),
+initial_wallets AS (
+
+    SELECT DISTINCT
+        to AS wallet
+    FROM
+        erc20_ethereum.evt_transfer
+    WHERE
+        contract_address = {{token}}
+        AND DATE(evt_block_time) BETWEEN DATE('{{start_date}}') AND DATE('{{end_date}}')
+        AND to NOT IN (SELECT address FROM ethereum.creation_traces)
+        AND to != 0x000000000000000000000000000000000000dead
+        AND to != 0x0000000000000000000000000000000000000000
+),
+wallet_balances AS (
+   
+    SELECT 
+        to AS wallet, 
+        SUM(value / POW(10, {{decimals}})) AS balance_received
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND to IN (SELECT wallet FROM initial_wallets)
+    GROUP BY 
+        to
+    UNION ALL
+    SELECT 
+        "from" AS wallet, 
+        -SUM(value / POW(10, {{decimals}})) AS balance_sent
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM initial_wallets)
+    GROUP BY 
+        "from"
+),
+final_wallet_balances AS (
+
+    SELECT 
+        wallet,
+        SUM(balance_received) AS actual_balance
+    FROM 
+        wallet_balances
+    GROUP BY 
+        wallet
+),
+buys_interval AS (
+ 
+    SELECT
+        to AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS amount_bought
+    FROM
+        erc20_ethereum.evt_transfer
+    WHERE
+        contract_address = {{token}}
+        AND to IN (SELECT wallet FROM initial_wallets)
+        AND DATE(evt_block_time) BETWEEN DATE('{{start_date}}') AND DATE('{{end_date}}')
+    GROUP BY
+        to
+),
+sells_interval AS (
+  
+    SELECT
+        "from" AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS amount_sold
+    FROM
+        erc20_ethereum.evt_transfer
+    WHERE
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM initial_wallets)
+        AND DATE(evt_block_time) BETWEEN DATE('{{start_date}}') AND DATE('{{end_date}}')
+    GROUP BY
+        "from"
+)
+SELECT
+    '<a href="https://debank.com/profile/' || CAST(fwb.wallet AS VARCHAR) || '" target="_blank">' || CAST(fwb.wallet AS VARCHAR) || '</a>' AS wallet,
+    fwb.actual_balance AS "Current Balance",
+    (fwb.actual_balance / (SELECT supply FROM total_supply)) AS "Current Supply %",
+    COALESCE(bi.amount_bought, 0) AS "Bought in Interval",
+    COALESCE(si.amount_sold, 0) AS "Sold in Interval",
+    CASE 
+        WHEN COALESCE(si.amount_sold, 0) = 0 THEN 0
+        ELSE COALESCE(bi.amount_bought, 0) / COALESCE(si.amount_sold, 0)
+    END AS "Buy/Sell Ratio"
+FROM
+    final_wallet_balances fwb
+LEFT JOIN 
+    buys_interval bi ON fwb.wallet = bi.wallet
+LEFT JOIN 
+    sells_interval si ON fwb.wallet = si.wallet
+WHERE 
+    COALESCE(si.amount_sold, 0) = 0
+ORDER BY 
+    fwb.actual_balance DESC;
+

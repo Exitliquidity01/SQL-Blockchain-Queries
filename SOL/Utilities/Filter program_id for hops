@@ -1,0 +1,3 @@
+SELECT DISTINCT project_program_id 
+FROM dex_solana.trades 
+WHERE project_program_id IN (SELECT to_owner FROM tokens_solana.transfers WHERE token_mint_address = '{{token}}');

@@ -1,0 +1,167 @@
+WITH initial_wallets AS (
+   
+    SELECT *
+    FROM (
+        VALUES 
+           (0x4561d18a9c52a0064a3a2335a5d0542052346ebb),
+(0x2f1e4b9644a9ee9ec5a786d8aa8e900ad2085058),
+(0xf786b493bc7af5b5ca9c879154e9e3b7c8f7e44b),
+(0xb21450dcb0f40be6f2b9e9cd893bf8f50fa901d6),
+(0x2876f40744f6adbf2e738e0c87a99b930b6e3ce3),
+(0xda4ffb3f63a465e2eb848ba4bb5c5a8c6afe315a),
+(0xe0101b347e54b7cdb1a7869eaa1ffc4dee94c970),
+(0x5b76f5b8fc9d700624f78208132f91ad4e61a1f0),
+(0x849151d7d0bf1f34b70d5cad5149d28cc2308bf1),
+(0x593889178ac483d13c181cc159653579722e357e),
+(0x5170513044fede2b4ba30361f422746198e7189f),
+(0xee917fea88f62a1b9281e22a5ae8f40bc63daaa8),
+(0xb226427175d4dda6f4b3f9b02637ac70c3901493),
+(0xfe2162a561b3a1d8ed42f4632f593b13ef14785e),
+(0xd935f3ddd9c4fa826e8622192192eb4d0f07d1e8),
+(0xadf0385585682c6825745dc54bd6817949de5fc5),
+(0x9efb3a2ba2046cd3f14a04c762eaaebb8ac7618d),
+(0xedef26a8a34a5ec7b67cb2d82838123cfbcfc507),
+(0x667fafdab09397666590973d0a09ade779d55c0b),
+(0x3491f576df5cbb40458b262ef6c69e8e50cfebd0),
+(0xaf1b20882f125a65275310204652af995ee23824),
+(0x6804fb2beb66ab0c38b1df3ae02ccf412a749a38),
+(0xdc90e0ea4c03602bec1710f8c5ea435208d37f2b),
+(0x84e44da852dbfd019447bd1cf8411a3671ab06c6),
+(0x826fcd8ebd8d78558f9479600b6e1adc0bccd5f7),
+(0xf61092f337c8c5bdfc2a88213efdf0afa6ddc710),
+(0xbdb902244f1235fc686b2af74f0e73163d47fa08),
+(0x6a00a755d10cfd6722014dcdccdf920bec5437f0),
+(0x8731ecf1afe507c58de1acf33d124501b03409f0),
+(0x44b6565f3b9b2b2074573ce4e2e8b48f061b6605),
+(0x2031d46150480f16027ec8ea2092ba5afac62666),
+(0x0d7661a7b7a89b40b6db128900557e4f1d1b3789),
+(0x34cbe66a828ed15097fe9d14474349e616982020),
+(0x931e76877118c84f1d904295971ce383ecfed5f4),
+(0x9791cb1176a78647b1f4e5c1549d539aef838d74),
+(0xcbdd38195130eea6b04af3a5cca56670a7c4c92a),
+(0x535a442a6c3b766df6eaebe90fa4b8573172c755),
+(0x1d99c74d47e8e17869281055b02f33fa3358b487),
+(0xa017f839dd9be2a5ebc76e58cc34ef7a542fae6d),
+(0x2c352e53a2b471b0d98f00d6117ee40e708c72b8),
+(0xb0fc4a30dd2c914af353311183bdd79874afda04),
+(0x4706be3d0f9e47724e23cfb9a3bd8d3391c6cc15),
+(0xa06419b0ab9ef8be6ce22814a0c6ec6bde4e4f32),
+(0x98f52f909c7377a5efffa58c6c8dc88ca4e62a2b),
+(0x48319605c0007c1eb35af3c0c8515bbbabf6fdf2),
+(0xc28d4b9f3b1ab84816ea38d8582ec77a479167ba),
+(0x8f0ffb43c22bde91adaa774cb7eb7ff87cdebb42),
+(0x2bdf1a698d39a4358e2c162deacc038fadb8a9d5),
+(0x35f68fac0ceca27335fbab87c9c526bfe9a31276),
+(0x88718a0102dcc7d0e7358d4db1539936c0179a2d)
+          
+    ) AS initial_wallets(wallet)
+),
+total_supply AS (
+    SELECT 
+        to AS Team_wallet,
+        value / POW(10, {{decimals}}) AS supply
+    FROM 
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+    ORDER BY 
+        evt_block_time ASC
+    LIMIT 1
+),
+level_1_in AS (
+    SELECT DISTINCT
+        "from" AS wallet
+    FROM
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND to IN (SELECT wallet FROM initial_wallets)
+        AND "from" NOT IN (SELECT address FROM {{chain}}.creation_traces)
+        AND "from" NOT IN (0x000000000000000000000000000000000000dead, 0x0000000000000000000000000000000000000000)
+        AND "from" NOT IN (SELECT Team_wallet FROM total_supply)
+),
+level_1_out AS (
+    SELECT DISTINCT
+        to AS wallet
+    FROM 
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM initial_wallets)
+        AND to NOT IN (SELECT address FROM {{chain}}.creation_traces)
+        AND to NOT IN (0x000000000000000000000000000000000000dead, 0x0000000000000000000000000000000000000000)
+        AND to NOT IN (SELECT Team_wallet FROM total_supply)
+),
+wallets_to_track_total AS (
+    SELECT wallet FROM initial_wallets
+    UNION DISTINCT
+    SELECT wallet FROM level_1_in
+    UNION DISTINCT
+    SELECT wallet FROM level_1_out
+),
+wallet_balances AS (
+    SELECT 
+        to AS wallet, 
+        SUM(value / POW(10, {{decimals}})) AS balance_received
+    FROM 
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND to IN (SELECT wallet FROM wallets_to_track_total)
+    GROUP BY 
+        to
+    UNION ALL
+    SELECT 
+        "from" AS wallet, 
+        -SUM(value / POW(10, {{decimals}})) AS balance_sent
+    FROM 
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM wallets_to_track_total)
+    GROUP BY 
+        "from"
+),
+final_wallet_balances AS (
+    SELECT 
+        wallet,
+        SUM(balance_received) AS total_balance,
+        MAX(SUM(balance_received)) OVER (PARTITION BY wallet) AS max_balance
+    FROM 
+        wallet_balances
+    GROUP BY 
+        wallet
+),
+debank_links AS (
+    SELECT 
+        wallet,
+        '<a href="https://debank.com/profile/' || CAST(wallet AS VARCHAR) || '" target="_blank">' || CAST(wallet AS VARCHAR) || '</a>' AS debank_link
+    FROM wallets_to_track_total
+),
+sold_volumes_last_3_hours AS (
+    SELECT
+        "from" AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS total_sold_last_3h
+    FROM 
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM wallets_to_track_total)
+        AND evt_block_time >= NOW() - INTERVAL '3' hour
+    GROUP BY 
+        "from"
+)
+SELECT
+    debank_links.debank_link AS wallet_link,
+      fwb.max_balance / 968000000 AS max_supply_percentage,
+    (fwb.total_balance / 968000000) AS supply_percentage,
+     (COALESCE(sbv.total_sold_last_3h, 0) /968000000)  AS percent_supply_sold_3h,
+   fwb.total_balance AS balance,
+    COALESCE(sbv.total_sold_last_3h, 0) AS sold_in_last_3h
+   
+FROM 
+    final_wallet_balances fwb
+JOIN debank_links ON fwb.wallet = debank_links.wallet
+CROSS JOIN total_supply ts
+LEFT JOIN sold_volumes_last_3_hours sbv ON fwb.wallet = sbv.wallet
+ORDER BY fwb.total_balance DESC;

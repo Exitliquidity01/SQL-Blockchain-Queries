@@ -1,0 +1,348 @@
+WITH MintingAddresses AS (
+    SELECT
+        to_owner AS wallet_address
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+), 
+
+TotalSupply AS (
+    SELECT
+       amount / POW(10,{{decimals}}) AS total_supply
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+    ORDER BY 
+        block_time ASC
+    LIMIT 1 
+),
+
+InitialTransfers AS (
+    SELECT * 
+    FROM (VALUES 
+     ('3WX2Xf151ZMLVHHhZtjNSqFpEe4a7HV5o9ahJspjd4bY'),
+('EgtyASZZuQ1vGg2LJYxS4ttzDzPQynDsc1BkhtPcmAJr'),
+('EVtxDeMXGcgVGQopvBEzcXDKyTjJqT8ng4YhjW74MzJT'),
+('AN5BxEr9GLH7Fm5ws4byBHX88CX6aFRToJCmEVo9Wh97'),
+('CTM8VDLvFmtNfneGMSuqULJfqHhu1cAbSnTWuESWt8QY'),
+('Z2QiGYaPxZzedoCmGokM76t8LWoFzyAASJYY77RecH4'),
+('Bc7tRoqR2aCxCQcSTTkxqhgim7pTZyqdNQdLotMaJyTA'),
+('EWJnquLj1Ghn6fFQQqGg74nvkED5SvDhT3HQnpNgsNfD'),
+('D9NSypWw5ixSbQEGEBZAkDhHBxDHhqTuwhoAoKLKbyUi'),
+('3db8X7Jt9jLp3qVqdSFHRhiQ8RPW8mNECdzsDntghHsa'),
+('CL5Lhtp5mDSLv6emZAXtV1BihtMexhnvMpmSdART8XBx'),
+('GUTdrXmxStES4qY5mJppzu3UQtw7jDcfSfppKbmdJc6Z'),
+('14fFThuudmqZ8Jvgj4cS59YCHaEvibmZSidFR54jMbsq'),
+('7if1ZMp8fdTZESoQrxYC6dCa19cW1MdcZ2kfivcBdbZN'),
+('FfDZiLM4MKNqTsNG1K39xkv2op4spnyFMhfrtbu6xZPJ'),
+('45ruCyfdRkWpRNGEqWzjCiXRHkZs8WXCLQ67Pnpye7Hp'),
+('AFuTEU1XBGyowyxcbFPmd1zXaD8bfBQ5BmNxJ5roFQN7'),
+('6AJfWuadB79sHoX7nEZYsTD9yPSZqhzLHbSqrgPo3s4C'),
+('BrFSyEkL6cPzsxvHNN5ZzLQ1RDishfc7ru6Sm3GDNXah'),
+('As4W5VBqBSsfm9EZndqRHDM3BWQHBdvNpFEk6pZX6VQg'),
+('CgxRWxSePYiGGdPqk8CgPaZ83wMo8surDHn77ZmR25ic'),
+('EQxfbxgXbvQPY6XyMvshpqP3LAyze1WUaq1wQDJNHXCZ'),
+('JBLD62G9db1XxVoFDwA5ZiNEdexDRt1gtqD2WYJDtjx2'),
+('EJQmiap8PDVuLrDaYHi3SdTdTHW3AKQyjfoio3c6KXuR'),
+('EjKtcycH9sAcdjW3oC9PUdaLwrH8fSK3G6ZnQkHVsqoE'),
+('EnWkFVcd7CFHsrR2UAQhZprh5pgXd8fggYq7fbaY8F1Z'),
+('BhHSvsjE8fNiSU5DnW7c1Xrag8Tp7cbasVytYzJZCv1u'),
+('EGF9Bu1T46suw8S5ov3mUSqFRCpnfEcDqKjWgMxhXso5'),
+('3TKbSfytN93QjtejZiHxXtMmc4vc2Syhco9qtwuwV4aG'),
+('HpboNW7JH2MwrWmcw6xyWpUPgmNShbWxjbLTR9DMXMUD'),
+('6oeSX2Hwg2HDpKbBSZVRZRcionGbxabTQRgphWLJSvyF'),
+('7UJLo1DuFoBwxwdLHFdpPP6ifiaD7RYXsRevijnremYD'),
+('4EH8L767giBvAu8cVMfr1f9btr43FvJMtniCsGrygmcc'),
+('9vBf4TzJvM8ihybnHiG3THyJW6upyFjobwjBEeiYavxq'),
+('FyScdozBMAtXgeNXkNpXeNQtskMmE3hEUZgA7tW3e4pJ'),
+('HUevWMRb2Uu8W1soNFbMKK2NWU2f432S6aCdPjMVbRfk'),
+('BVicuhnmxKQkknHQb4SHpqtyeGfwmTwgxQHuq9DNJ8Bv'),
+('7BonBz6B2QHJVvu84vAeX98DuPcvEw4fL5T1EKHNdug5'),
+('5sbswAwunUMv9kZyF6LMmpKs3DJce3L5haNWQVnEr7oE'),
+('6fFqtpTKTmgWiPVTiqPDvyR9p7F5bYG2UdHEUqS1tE7i'),
+('2EGkhj1vpAdxwyjzAap64U13ccwgadwHsjgpJvvedKhk'),
+('5Qzbj3qM8jBKfXC3cVrpA4pri3acaexy8zE9BUhrsEzu'),
+('ZG98FUCjb8mJ824Gbs6RsgVmr1FhXb2oNiJHa2dwmPd'),
+('DyzA76YDFFxDSdeCxqd6KTDbU6yBxufQWxnACYvqePvZ'),
+('AhxWHqnEsfkYFmqjUt4dmahrYACZ8FvS8H1k1WewmJwT'),
+('GJvxfAuy6WNf2jcvwc4mTH2WuUExzgPgyM3nDMyPDJEt'),
+('2PUxsKVNLjZF25vr7SSFky1G1WQRsArviUa32wVwQuwN'),
+('DTMXMinijeMkfVKJdETeEgHBATCZ9WeGNjAJNbBhdjSd'),
+('DxcxZczRFufB26eKpY2A7si84HEyBEyxNvj94XmbFpg5'),
+('6WL4qrvNrXBWy39kKeLBSiyHjV4Y6vv7F6yegBRirocU'),
+('DnFQYgef4qQmsMbfRmDoeH2n751SyBm6HbHZk2KbwfAY'),
+('HqzABwbJNPvpvQjTphwGkdEdZjYKwcTmTHCeQKmQeBpQ'),
+('CTGA7yreCwpFVcPSNgsKEs6uF8ZpT3aCS7R9vBzLFPTv'),
+('EcfZvyXW8cwvSxzyMvSPxz6WVCctmm4J86mJuw4E43Ba'),
+('8H3ffhMSwREUKnRMGQ2nxnHSt9tS3fc3W1XXNBNxt1Fx'),
+('fnVb6oGZyedeuf1PCbz4jR9rYAf9vZEa1JkDajN56tc'),
+('GxWiDiVS85vFp1qCR6Kihu6tcgvdzbY6eZBunDfm69Pn'),
+('6VMtegRVASAhAutCBgxfQRcEMAzc223Pyv9HUNu3LyB4'),
+('6JsqxknYUuKfX4DHqPaRr5wLVsoU5PZvPimhQjAAQoTT'),
+('6oTFpUNCiVoyupefDog8MJnZ4jAZqHdpcnePKjGKmEWo'),
+('Fj6cFYanakSvACJ133JKngB77Po8Jasqur9eAdg6QE2n'),
+('HxjjNun1RVcskpQLayezBjaYV7qf3bk1z1KFhZrFNwXA'),
+('Bg6YZotXuej3eNMNoKYziA7aiP2UuL6B88uanPWVBXNT'),
+('tXxzhBV56CHPSwVP1z3PsyLCfToNwxVsr1B8xQdan41'),
+('BMWgRuou9zJKTtBDpYwUS3CLFATv6bpvT8EdF1Vworbg'),
+('CTWVoRhJP6ysaXeqcuMf5P3EZkX1ZbdN3qeNdY2XrXmR'),
+('BzPvHP8iS3BhmT9rrKbdkzxdhaPV555P9Hhh6SWTcMtg'),
+('9eDG8ZFVm1fQKVWAwCcsZf4uQ55wrdZdFy6hcA9Ha43z'),
+('JAF2JGEtaG6SWZpixPv5EFV7hBsYHB3aeidYCnp4epaU'),
+('5t1GwPBggythaAPe2azu9W7BzoiqUnBo5omzgKSWthaU'),
+('7MR33XZzHj1dka5oCdVJDXGpxyPWUV1ePbffJGbs4say'),
+('F51BakYB7nLj1G9M5Rvm84dwox3M19Ci5kwkTaNeo34x'),
+('7Xiq7y8QhnPPu85nwvj5aTtxBe2GgfwKmc6X7ijyyjPB'),
+('5pZdTgfWoVMtjDWF43mcwLC5mhAVEH83QyT8ckfdwgko'),
+('DTxhkv2P4ziiGLiYvfPtMuVNubFX4MdogNJkwYQ9PZZZ'),
+('HFqp6ErWHY6Uzhj8rFyjYuDya2mXUpYEk8VW75K9PSiY'),
+('66QPRJ7SjWxZrZUpLc1DL3rhJyTjZHZoSfYcXRCu61Bu'),
+('BKH65zaHFGcS9UaVvs7mDbrfHkwkqeu2jNZmVLBF4zNh'),
+('HLgfqkfTJaNSLNACrX69EKPs6b76zKV8g5EEDfvbGyDe'),
+('GVXrtYLSUMdm1eypULn381JBmFwYuP1tzQfKVDRT2gHG'),
+('BTjyeXbJHbMZP5SsSBfqrh73zKWaXrQxjwBPw8yKjb97'),
+('HrUvrcRSNn9hZP6rXHnncxGw11k5dMtLxrsfFePUKmbA'),
+('AM84n1iLdxgVTAyENBcLdjXoyvjentTbu5Q6EpKV1PeG'),
+('2YjUWHJQu8fdyQpiFVk4UsMibfkTQZiUwE6artdrbvBh'),
+('8PZ24hndugwYVqezKKCym629cB3RoUXdT92oUudEoiZd'),
+('7QRe1z2bEbJg7SKaF58iaKMwVwqZzYLE8Lwt4a3jZhBL'),
+('CCKw2Qa53oWigQjgY2as197m3h85HZhT95UPTLghQohJ'),
+('BEQpxVQ1VtX78y3ifxF1rGwUTcQXooKXv4TJs2qUH3tb'),
+('EPtFYd7KkhzDCA3mnwv8wcdUwh3ZD3yasNusE8Loa9VQ'),
+('8SmYNELfmYRnsdHd46ACxsEAQuXP9w1YwJbJ6Bb3d59e'),
+('1nVD4dZ9eGfttHqefUbkyAjoRPgT5jJMTHZe3ZtzkKE'),
+('4ZDoibAbeF6mJsTs4fFr9N8pUSUfg2FVf6DU4NvX1CHx'),
+('7s5ztPpsDXH3cziSnv6KrXXrx1wkfhtzkTsxFpvzwGwJ'),
+('24bVuCe1JvZVfQuTWfsovFRjP1j6uFUM3YhM9xqePJB8'),
+('BCeLHF7EMoH1TuD6pz3EVbAm3vrpRCLprjHD9Vd4QsTu'),
+('CN2rDBSFDMkQCdqyANRETB1P8JnKDvwx58qHF6CkT72t'),
+('5Bwr1cVHyPC7K4EL8hAYDsEvWfzYrYcpTZZmDrmrXbPp'),
+('FzyioMYqK3T3NMpzZa3c2VS5Kk3cCSfpfaF2BWqnYYaz'),
+('9yRH2Kek4JpLfAuP42WSyBb6RNW5X3u4hxWsCNqSL3gW'),
+('GSVTi87ER4L4AaePw6MfDcbE1nXGYgvFsiRVD3y8yFxQ'),
+('Aj57tQdyBqgPvXvEXuJaFxC3X8LHywemAAwG8AaMcYrB'),
+('3bNKKcppuVKujPYgQK6AX9rPXQVkToEuL32BVHDRyp6T'),
+('476L1T6gdwuZjndDn43DGFovGWdB9CrH7hgF31HLoFwS'),
+('7psjh8kXRDsq3J2rUywgXCCdjKKybaQ5pstknR6hmEdT'),
+('9aWrKozuRvvTLCb1sfXEjJ8QhtzqWuzaLtFEpcsEKfwr'),
+('EmR5XBGy9Jq7d7EGYDhR2cL5ZSHa2f9LbjVpLeshf5xY'),
+('7Ez5P7P4yEMGTcHfQKW6Mxb5hxoN2iiPDdekwEGxps5N'),
+('G3xZJtkWTcWPEveFWpLMtubuu5X5DXRmAk5AtbxUjG8'),
+('9jAmHFej6FNgStEBDBJqxcpuuQt1ifG7eJpwoyK48CcM'),
+('4eY2cmsUBagYUrqx2F9Wo3VZgLq9sKUhvsTyoYDjV18C'),
+('DsMpeMxFFdaNsVsd1TB5ZuWvg8rZ1uNN7wPK9UvBsvB6'),
+('4463J4x15sgGCJE9y7b1ctpa8LRQ7Ch3fWrCdCHp8r8v'),
+('A6NKVM363QicMppUB2jTRDFj2a1MekNjyWGuVYE2Trdu'),
+('7VWpxaropYQx85MUbiMni8HhLARLz8abMdGqUTTvCWzn'),
+('HhX28CjZUudKrQEPGXEgmnJhAA2DqPfBQGfDAMukEDUC'),
+('GV4SZbGinvroLUBuQH5UUwE7MtSzb5w996KBnX6Fa3Ci'),
+('9CxnPUPzTYeDwXnEZQqhTq7DpjheZPSpT4h9AA797Rfm'),
+('DePpBpegktKv6BL48jv12S1CP6JYSQFyqNEdiDXz2HFL'),
+('DRdGXexdFXDEaAD66EkZnLrMgacGxhDAZNnDAqXhfDZw'),
+('5s5Mr9MfnEwvkPjXfRdBe6hkbZCCZkavw5rQrMr1TbLs'),
+('Dda3ABB6e31SpawVvJvDj5L7aT2a6fbh9AR1FnZBSeUT'),
+('6wLUNd1yXxduPD6CbSQwgUzmFyUq8JRVThEkex3sY2cx'),
+('4YYT5PNEwnKYG6AuQceFGhUuzBUtED4gAqYKYVanorEd'),
+('B186MztmegcS5ZkX5BDskUZppJShNg3CqRxdUX3kgdnc'),
+('9quZxmbtFHLRxawdxHqKkBUHfQnrPBvci7MnEdmQQkK7'),
+('CAVRs8DyVGiqXAS4PQccAdfQcoWhRCtEb2dhtn43Dqtr'),
+('Ae5josofBamZHZ7uHmW3zpR9y45LSCHAFtDjthzZYyv4'),
+('9j6EYCkzF69rn3UfYwoXCpU8Aqp5bPvqjj7wdzihEzwg'),
+('3XLoBqA8YNttim4Ei36MFzaC8wnuay1ZXuAammNgVuP6'),
+('HENU4axo2NsHQGLW6yRYGDni86NBMQoUzu74uV5ntBj7'),
+('7YvEKJqRoRx1BGect61Dpp7gL6Qdazz9ESFLy2igVQHc'),
+('FPqZv7pkSvu66ojZuf5ec5bHwHrrGsF5G2EzCPpCXcB8'),
+('88FmnnVrGYiYsk7yQC4KRG7VSSbcBGHmLBSiMhjn8kY9'),
+('ZLw9Brwhufy23QhuqPSuRXPk5i5yBCbA6iqCVNKCvMw'),
+('777k8SV7rmRhLDiFNZEKgHMtd8zF4bnoxw5dSebkgF8L'),
+('8bYCMQzj2Q5dKcsiRsHUYjAfHauu5Bas378RUvpLQ642'),
+('3QcV6BYU2ZhehYoqyKbkS1taaQUqEtyL1EMzZnMhaQhm'),
+('BfBhDmqxJBV3nHy7sx16u7Jkywnz1GiNV1GETuyD8TNE'),
+('JCe4K6cQZ9NoxJs7iC6QLpW3YaAC5cuVUEfyaTPPRZFZ'),
+('DKR2RDgM5qFj6G8jXSHe3VDfzVeHDKCUMYMSGoex4ggh'),
+('9FFtkmMHkix9HWY2PZ5fxU9LWzhQjyYr2SYGQsFmiHSq'),
+('7PkJZTF5LfWH7iPQ3akiybGGp5yuSeQYM8WvsX3EAioh'),
+('B5CX1nLbrABDa9zF81Twz4jfd3pgM5BtE8YcEFk92rnS'),
+('wX8ZxTUJaceszVQqrd5HLdtnK5Nhtahs6g1YvX4MJsq'),
+('JBteCcrmpNFtfe7c3BWbZTMxhTt4ZZxZwxFRoXbRauZM'),
+('6G8qEnPBHDkEqfiCGT6bSv3Sk6uLUrDD6vPpViqpc2Kr'),
+('HNY31S6odefTmvT7Rew2SzW8cP3dmHfGhrSGPvk387Kg'),
+('29v8SKxgwBMn79Kb7o6Tg7xzgWTZutqY2cjFtdDE7n8B'),
+('2es6niR1oGRLhjotf4VfKCNqtNfPEpUPpUYJ7HBvbo6h'),
+('2dX6hfLHVKwwgjCwmREc2htH4eXLSsSep5XBc37szEzz'),
+('9SzYUHe496aUi7G8c5jS7MHnCzx2xqiKbpKGTRgTPYSj'),
+('AABCWB2G3HiZoxj7VA4TEdwbSUtWNbNwDB7qgbMdpjz4'),
+('EcWaZiQtirKfWVxn1FiGWvDAn8ahwyE5peEas7xBjrwi'),
+('CyXhC62rqmnEbMwoKX4T7VYXEYiQQxqGN3mXqbUfqYsj'),
+('6d5bkvGXEWYJiZthcJqUpM2ED8d9YpF6Hmk7hSfEVPoY'),
+('2ZV6C2SN3Y1XjGMjvKLGFWTYKT67QmgsJD6fsscDEi1x'),
+('DA6Sn2mqtWiZ5w8oAkXhHDDRuLbQppFPHzaLW3ymUcab'),
+('HeexGaWhcqQJz1fHxKyBAJ1PP8BE44betXmSbmj9wRPs'),
+('CCB9N4K9wR8TP2q6VBFfbNS3bWHYYdEedCE3KPxFmQUD'),
+('tHKY3ZjCCyYZg2otpejKQgsEeCAihS4RgCP2dyFHdWw'),
+('9RAbsnQXWw7kCUfpE9Tby6gKk3hSJYUndQZskBHcSaR6'),
+('3UD2navatSvCHAjFBw9E5xPES1F6XZHwXLGH9bNnupNk'),
+('GCSaj5xMm2QhzfCi3C6Bd1y5QpayKwHUjo3XEMyWKBLR'),
+('7wykm8yD9YD78js5W6p5ijfgspsPYKXE1i7KLxRqpT7F'),
+('5Aq3z717RgyviKKb7LLP8XprQawFochafnhvq8HM5Mjt'),
+('FD364oKjyeeew22KYR5r3YrUkqsef2RtWHNQigDQdaF2'),
+('GLRG37eVpokYnxmNN2sfyU8Q8NEpMJwuC5teJkEjDDGW'),
+('dQ3v9M4iPSDGjnCtTXgCmjGzeoReZ4UpBkxJGAqr3q4'),
+('5YZjm3r3fkgQjuh8T5dg5MjZ39L7ZmvQnyot5PNDvCMa'),
+('4HrCoSTZXS2RsJY7ZJwz4Sn9iS18YtWgvkbTuKRYiJHU'),
+('HLsd9YadNTKx8Jf42nQyzXHqq9bPJ4N7REcoDbZSU7qP'),
+('8aA8tunRj2bs5hCfqmCwc4JT5W3hpUcsb54Y9JBTbFJe'),
+('8ydVP95o5Tr2vqfg5nVyAVUArNuJfkFzFse8hmkFSFG6'),
+('5wqDpp7jHibZVpSwswem7UF5VwDf6toDJWtKau52ZwLP'),
+('3vNKaWzdqm43T8BCL8fh5bDrj4pcQMSZpjYYVShJY6kD'),
+('9kQ4soB2sjyDzpiZyarXjJ5rqHRmrXqWSLBk7rx9zHcm'),
+('Aeaiin5wftfcQnMj6r7fxYK8wcQcuHJGDJQFrVWHVbqy'),
+('AoTW8rD5ecnexbrxu3r6JnDQ9ZvE2VpgVMTHBN2TT2v5'),
+('3y1Br7Pp6CLgoVQWE6W1cDZqhnzQ6nuwQ7FyVJ9KNYe1'),
+('2Y5h2QRcS4B7BRNuL5QeQD5bLXPH93Nt6ZN96T2MPiwf'),
+('12fPWJKJfWDn2mLi6654m5uRQegWgwUQTsDQNL9XUDhQ'),
+('GF7i8ffy87e43m1gRHQSpqHcjVEwfq6vNAYQ5VsDDunC'),
+('GVENgWWANZKee9eF4Rp2kMbF8ozMDUm2m2eMLRrYsFxF'),
+('7i5h3NqaCJ6Hok2C6CsFDAsN2kJ28ouC1Ey8kqopgxAZ'),
+('HsTiEA7mhj4J8matPNnHou9TVFTKL13wzQwtrRyax67P'),
+('e43BkEamoNUYbiQBVBKVv1SKp7QioYu8MAdpeAmnAqj'),
+('6xmd19eirKmPtr2yd9ppwYDKJU7eQ6Hm2yCGQUTcHBtP'),
+('5nBHqsjQUcu8V5siRhpBwtJVeGwB3Up4qjD7Wm9h5c2x'),
+('9Stqhi1dFQ53MHHABXtz6uLN8fjjQoNy98MEJd7heyQu'),
+('EUDP72zSApeQ1yUf9jH5iaHU1txu8c1eb62genDwnvJf'),
+('9um99cfiUZGbmpEEXATcM96gqaUfUu1S2enCZeNdzDCk'),
+('ECUwrND4YLDw7PK31ULkGK4FmYUcMQ9tsg4mFfrM28Yx'),
+('HguE7i64wvd82b4WEzf2YEBj8vuufnyikGLf2nzzGEzo'),
+('231dhJ9nZevz8wgZDyyzXST9iUensYUWHXc5Sd7YjyyE'),
+('7pdCfob7jrNEMCuVcnYhtg2AGykJm82ZZqxBRr8RC89'),
+('F9JD9QmYZDwND3m5hCxL5GdqJFtg42vatbr9AGoJQae8'),
+('9gWo9ZpWvh7zJVLAJEmfHtzNU6pRz7SAA98BpQ5C8wrm'),
+('AAb4oRc8LSmgwWEUvKi99wCsmjGB82fSAYukPqfJc2kZ'),
+('E6kiEC58pdYJVG5AHtPza8v3GQWrRvFkCqaU8e63PLhz'),
+('E68LKd36vbsZQAibTTWMgHw1yYx1njtmnEcpQiTG1kZD'),
+('GRakmsV2pSStshoJp9VFYCgKXkaL79vJiUNA63FKPM9u'),
+('EiceH5i154FEww86xjUSvMtAe6SBu5BGZhekoDiwU6hD'),
+('AfGgFFfvCgqGxv7zBjsHKVgAWJnLDh93DSV2jSbtSf2V'),
+('CG9ujhJYUR9hLAxCUTcMvdYHCupkrXfjgSrEczPrjhnU'),
+('3dYPwnu1PwtNiqHF3GuC9z7NBBXWQB5oMwa1wSpr3PCm'),
+('CpG7TTYNxPE8u8vHoR3QyT9ZnATHAVpDvNKt2WjJqdGC'),
+('6ZfifRE1hZDsgxDkUESGtpJwEhVksZgucFVyzbddgT6c'),
+('9yck8gsEBP2K38uGmZBGa7x8buNC6ZNWZsXSpjADowGM'),
+('4RAbrn1EpPrKUM6Wr9meg9AtpsWUJG5QNemmhWFMtJM7'),
+('CtHKzsKCAAeFGexXN4XmzwmRJqskgLk1d1uRixSN3JRF'),
+('CRVidEDtEUTYZisCxBZkpELzhQc9eauMLR3FWg74tReL'),
+('DGp9H4JJUfnt1U3EqhVoUZqocxEendXL5hjow683JTn7'),
+('EX76okpTr5wSX6PD5Csjq1SeV67r5Um6SngZ8ncnRMEe'),
+('9kx7x57Y3tRVDt6iisegQKEz4Ze4syDe6UFByvHRKUfK'),
+('5r9PixohhgZbx9qbuLnV9emZkbPTuQsnzAk5ZuxRk7sA'),
+('5znUMqXw6iDBB2QPghFxAsyvMM7rusiTso9PDf9sJBPg'),
+('88TwRtk6hgeJ4mwQKZ1CHds5JQBWfEkRoV26h1h89qo9'),
+('53SoMcJvBFKnE5Yf2oJTQYesKYQ9nxYzVDCULE76qU5n'),
+('6u5vKyTZ3n87wVDtrSZi97coWC2ScVUeHv7Y2acxNBi5'),
+('EQ4dxrFv5VKi3rzxCSvpdkLG5c9kSfyq4KkDpwXY2agi'),
+('GGTLXbCLT6TfmkEqyv1jfsefdcqTNyEahoDJgPGWo5Kx'),
+('6B2FXDbjp9dvowVhQ9nepERnkrMPFMX8Cve3yeFmQE3L'),
+('4LdisH4ESZoZgJVkt9HRq9wYoziRmtjuxcusZ2pwwLXx'),
+('GqhprGSwimq8nyoXPv18LquTi4ZwT9RQp86hTqCJpW8f'),
+('875uR4ijdpesSZ8aKVCXnW1a57RTJkHph3JhgcxFUFTi'),
+('CYZ2bZd3ato5ZAbWBEPks6GbUCqLMZUyoE6cXtdikpLk'),
+('28pKRgKpELunmTgnsSCTBm1KVsnQD9n5Dbio63ptKJrW'),
+('4zW6airF3CHJViYot6SJEQmxqBUNHeP8DAm5wuX3ruYj'),
+('FoQ6DLBnhvTjnRbeH8mK8w6quEjtEsMtJNtgcnfvtWqT'),
+('PZ3kq7eprNTrrf9vXtfGLCaBhSctt9Ut5KknicKz99X'),
+('Hgwvftye9Vjo1gHNH5wRx4z5rXvnnQopHosERPc3pmDf'),
+('FQtLebJ2zXtJvLJ9WvqoXt7WXi13ZGnQhfdfRFRms8Dc'),
+('JKA3iiQPdXN2LjmoktuU8Xarc6fQGpxYfan5dJTgkNL'),
+('B4AxYCAakSYiJDy5W3dyUy359NsoSRQtyXy7Vb9SWkuA'),
+('DW93NzKerJoJuQAkWPjvyUSchPUWgdvAxahbQy1Xhoue'),
+('EpWixYDpECEJQNBuGj2Set4xPngfwmnXDU1ZPfCHRFvG'),
+('FSBJQNX8eFiSvQEDAmNH9KFBxEymGqaumxDennAL4vM6'),
+('6zC24jtRakeDB591k7NNZ1RHMznEE8aUn7G3c5MSWLKp'),
+('Cnmd89am4usR31ACrGgZQHkKgHkecAJmqv5Kyeh92RC7'),
+('BrdHEBazm8AD4S3bUAuXDqJEvjTrrc7iRGXjefaiqmom'),
+('DMnRHf9CBgZ7QxrAwVadb1k4uXayZhKhCo8F9q2UbfME'),
+('8USwEG8GDvTvV4bBEPnyfeEpsg2tYnk41NBZXWnnYA4b'),
+('HCTkRrNShscVdmdJKmPEk54sDb3ncFAesuqpmWpTA7Vx'),
+('3P5cF4KtRncvB4t29qsp7djp8FidkQhKbDGUQdHEtCSx'),
+('B3AgDQT825gV1Qs55ywqXWoxyMT2DsZSSXPan9Xvwmrw'),
+('7XB9595zpehikKTXcaywJPx6WUahnqmky6XNP9cNXXWx'),
+('3FqpPFNH7HhTfzfTw7EFk6mYVh5GTJDgfVpQTsYUc8R5'),
+('6nPoNcUsaUWrfALVp8Bx6QVTV8PrEAzCXtFXqzrvA1jn'),
+('HHhs18sA26cAsTAxjQe66CtWxkBr931Jxc5YbBbTeiQh'),
+('GsAieaSP1qPbWMKUerGvu7zDpngX1nZJb6iSCcexHmwE'),
+('DGoiQM1LowxZsSCe2Je3ftNmAkMTuDTpH9Fd5jWRZx9f'),
+('BUdPUnNL7gaMk3gaXin8k2Zx2uqjFDqq9gwu2raYuqoG'),
+('4aULVsKTnpmiqf2F4ouquJHYM4kHETgngDqodKsTrbuZ'),
+('57heio8Bdbv3vsdNmZGfdhSbgko7fkLmWtZgKsov5EnU'),
+('AZPXbFxeVtV3D1cymUyez63boP4UcNiUZt2pfBGeFgjy'),
+('9cAcKCmkZBWkFt1s5pYEUPRhwFVPbZmpDkGSYefRGY4N'),
+('2S1Tdm8dnxBbuja2eFXEEWg3JaXQbBdBhTTU8Yo8s7Wn')
+    ) AS provided_list(wallet_address)
+),
+
+WalletActivity AS (
+    SELECT
+        block_time,
+        to_owner AS wallet_address,
+        SUM(amount) AS balance_change
+    FROM
+        tokens_solana.transfers
+    WHERE
+        token_mint_address = '{{token}}'
+        AND to_owner IN (SELECT wallet_address FROM InitialTransfers)
+    GROUP BY
+        block_time, to_owner
+
+    UNION ALL
+    
+    SELECT
+        block_time,
+        from_owner AS wallet_address,
+        SUM(-amount) AS balance_change
+    FROM
+        tokens_solana.transfers
+    WHERE
+        token_mint_address = '{{token}}'
+        AND from_owner IN (SELECT wallet_address FROM InitialTransfers)
+    GROUP BY
+        block_time, from_owner
+),
+
+AccumulatedBalances AS (
+    SELECT
+        DATE_TRUNC('hour', block_time) AS block_time,
+        SUM(balance_change) AS hourly_balance_change,
+        SUM(SUM(balance_change)) OVER (ORDER BY DATE_TRUNC('hour', block_time) ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_balance
+    FROM
+        WalletActivity
+    GROUP BY
+        DATE_TRUNC('hour', block_time)
+),
+
+PriceData AS (
+    SELECT
+        DATE_TRUNC('hour', hour) AS block_time,
+        price
+    FROM
+        dex_solana.price_hour
+    WHERE
+        contract_address = '{{token}}'
+)
+
+SELECT
+    ab.block_time AS "Block Time",
+    ab.cumulative_balance / POW(10, {{decimals}}) AS "Cumulative Balance (in Tokens)",
+    (ab.cumulative_balance / POW(10, {{decimals}})) / ts.total_supply AS "Cumulative Supply",
+    pd.price AS "Price"
+FROM
+    AccumulatedBalances ab
+CROSS JOIN
+    TotalSupply ts
+LEFT JOIN
+    PriceData pd ON ab.block_time = pd.block_time
+ORDER BY
+    ab.block_time ASC;

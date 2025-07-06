@@ -1,0 +1,113 @@
+WITH initial_wallets AS (
+    SELECT *
+    FROM (
+        VALUES --EXAMPLE LIST--
+            (0xB4110644B8a91274Dd1fc4802C224DB9850a1e12),
+            (0xA34e1282620aCEBFE18D372b9b434Bb1D72F2f75),
+            (0x1FeA1cF0920691Dcda9b6A7Ae2b39e4a62F1D71b)
+           
+    ) AS initial_wallets(wallet)
+),
+total_supply AS (
+  
+    SELECT 
+        to AS Team_wallet,
+        value / POW(10, {{decimals}}) AS supply
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+    ORDER BY 
+        evt_block_time ASC
+    LIMIT 1
+),
+level_1_in AS (
+    SELECT DISTINCT
+        "from" AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS amount_sent
+    FROM
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND to IN (SELECT wallet FROM initial_wallets)
+        AND "from" NOT IN (SELECT address from ethereum.creation_traces)
+        AND "from" != 0x000000000000000000000000000000000000dead
+        AND "from" != 0x0000000000000000000000000000000000000000
+        AND "from" NOT IN (SELECT Team_wallet from total_supply)
+    GROUP BY "from"
+),
+level_1_out AS (
+    SELECT DISTINCT
+        to AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS amount_received
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM initial_wallets)
+        AND to NOT IN (SELECT address from ethereum.creation_traces)
+        AND to != 0x000000000000000000000000000000000000dead
+        AND to != 0x0000000000000000000000000000000000000000
+        AND to NOT IN (SELECT Team_wallet from total_supply)
+    GROUP BY to
+),
+wallets_to_track AS (
+    SELECT wallet FROM initial_wallets
+    UNION DISTINCT
+    SELECT wallet FROM level_1_in
+    UNION DISTINCT
+    SELECT wallet FROM level_1_out
+),
+
+buys AS (
+ 
+    SELECT
+        DATE_TRUNC('hour', evt_block_time) AS timestamp,
+        to AS buyer,
+        SUM(value / POW(10, {{decimals}})) AS amount_bought
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND to IN (SELECT wallet FROM wallets_to_track)
+    GROUP BY 
+        DATE_TRUNC('hour', evt_block_time), to
+),
+sells AS (
+   
+    SELECT
+        DATE_TRUNC('hour', evt_block_time) AS timestamp,
+        "from" AS seller,
+        SUM(value / POW(10, {{decimals}})) AS amount_sold
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM wallets_to_track)
+    GROUP BY 
+        DATE_TRUNC('hour', evt_block_time), "from"
+),
+combined AS (
+  
+    SELECT
+        COALESCE(buys.timestamp, sells.timestamp) AS timestamp,
+        COALESCE(buys.buyer, sells.seller) AS holder,
+        COALESCE(buys.amount_bought, 0) - COALESCE(sells.amount_sold, 0) AS flow
+    FROM 
+        buys
+    FULL OUTER JOIN 
+        sells ON buys.timestamp = sells.timestamp AND buys.buyer = sells.seller
+)
+
+SELECT
+    timestamp,
+    SUM(SUM(flow)) OVER (ORDER BY timestamp) AS balance,
+    (SUM(SUM(flow)) OVER (ORDER BY timestamp)) / (SELECT supply FROM total_supply) AS supply_percentage
+FROM 
+    combined
+WHERE 
+    holder IN (SELECT wallet FROM wallets_to_track)
+GROUP BY 
+    timestamp
+ORDER BY 
+    timestamp ASC;

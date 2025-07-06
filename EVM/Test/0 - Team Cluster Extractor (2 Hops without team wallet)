@@ -1,0 +1,110 @@
+WITH 
+team_wallet AS (
+  SELECT 
+    to AS wallet
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+  ORDER BY 
+    evt_block_time ASC
+  LIMIT 1
+),
+level_1 AS (
+  SELECT 
+    'Main ' || CAST(ROW_NUMBER() OVER (ORDER BY MIN(evt_block_time) ASC) AS VARCHAR) AS transfer_level,
+    to AS wallet,
+    SUM(value / POW(10, {{decimals}})) AS total_amount,
+    (SUM(value / POW(10, {{decimals}})) / (SELECT value / POW(10, {{decimals}}) FROM erc20_{{chain}}.evt_transfer WHERE contract_address = 0x8149745670881d99700078ede5903a1a7bebe262 ORDER BY evt_block_time ASC LIMIT 1)) AS "% Supply Receipt",
+    MIN(evt_tx_hash) AS first_tx_hash,
+    MIN(evt_block_time) AS first_block_time,
+    ROW_NUMBER() OVER (ORDER BY MIN(evt_block_time) ASC) AS raw_transfer_level
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+    AND "from" IN (SELECT wallet FROM team_wallet)
+    AND to NOT IN (SELECT address FROM {{chain}}.creation_traces)
+  GROUP BY 
+    to
+),
+level_2 AS (
+  SELECT 
+    CAST(l1.raw_transfer_level AS VARCHAR) AS transfer_level,  
+    e.to AS wallet,
+    SUM(e.value / POW(10, {{decimals}})) AS total_amount,
+    (SUM(e.value / POW(10, {{decimals}})) / (SELECT value / POW(10, {{decimals}}) FROM erc20_{{chain}}.evt_transfer WHERE contract_address = 0x8149745670881d99700078ede5903a1a7bebe262 ORDER BY evt_block_time ASC LIMIT 1)) AS "% Supply Receipt",
+    MIN(e.evt_tx_hash) AS first_tx_hash,
+    MIN(e.evt_block_time) AS first_block_time,
+    l1.raw_transfer_level AS raw_transfer_level
+  FROM 
+    erc20_{{chain}}.evt_transfer e
+  JOIN 
+    level_1 l1 ON e."from" = l1.wallet
+  WHERE 
+    e.contract_address = {{token}}
+    AND e.to NOT IN (SELECT address FROM {{chain}}.creation_traces)
+  GROUP BY 
+    e.to, l1.raw_transfer_level
+),
+
+wallet_balances AS (
+  SELECT 
+    to AS wallet, 
+    SUM(value / POW(10, {{decimals}})) AS balance_received
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+    AND to IN (SELECT wallet FROM level_1 UNION ALL SELECT wallet FROM level_2)
+  GROUP BY 
+    to
+  UNION ALL
+  SELECT 
+    "from" AS wallet, 
+    -SUM(value / POW(10, {{decimals}})) AS balance_sent
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+    AND "from" IN (SELECT wallet FROM level_1 UNION ALL SELECT wallet FROM level_2)
+  GROUP BY 
+    "from"
+),
+wallet_balances_final AS (
+  SELECT 
+    wallet,
+    SUM(balance_received) AS actual_balance
+  FROM 
+    wallet_balances
+  GROUP BY 
+    wallet
+),
+total_supply AS (
+  
+  SELECT 
+    value / POW(10, {{decimals}}) AS supply
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+  ORDER BY 
+    evt_block_time ASC
+  LIMIT 1
+)
+
+SELECT 
+  l.transfer_level AS Cluster, 
+  '<a href="https://debank.com/profile/' || CAST(l.wallet AS VARCHAR) || '" target="_blank">' || CAST(l.wallet AS VARCHAR) || '</a>' AS wallet, 
+  wb.actual_balance AS "Actual Balance", 
+  (wb.actual_balance / (SELECT supply FROM total_supply)) AS "Actual % Supply", 
+  l.total_amount AS "Max Amount", 
+  l."% Supply Receipt" AS "Max % Supply", 
+  '<a href="https://etherscan.io/tx/' || CAST(l.first_tx_hash AS VARCHAR) || '" target="_blank">' || CAST(l.first_tx_hash AS VARCHAR) || '</a>' AS "Tx Hash", 
+  l.first_block_time AS Timestamp 
+FROM 
+  (SELECT * FROM level_1 UNION ALL SELECT * FROM level_2) AS l 
+JOIN 
+  wallet_balances_final wb ON l.wallet = wb.wallet
+ORDER BY 
+  l.first_block_time ASC;

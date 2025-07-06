@@ -1,0 +1,88 @@
+WITH 
+total_supply AS (
+    SELECT 
+      value / POW(10, {{decimals}}) AS supply
+    FROM 
+      erc20_{{chain}}.evt_transfer
+    WHERE 
+      contract_address = {{token}}
+    ORDER BY 
+      evt_block_time ASC
+    LIMIT 1
+),
+initial_wallets AS (
+    SELECT DISTINCT
+      to AS wallet
+    FROM
+      erc20_{{chain}}.evt_transfer
+    WHERE
+      contract_address = {{token}}
+      AND evt_block_time >= TIMESTAMP '2024-06-01 00:00:00'
+      AND to NOT IN (SELECT ADDRESS FROM {{chain}}.creation_traces)
+      AND to NOT IN (SELECT address FROM cex.addresses)
+      AND to != 0x0000000000000000000000000000000000000000
+      AND to != 0x000000000000000000000000000000000000dead
+),
+first_buys AS (
+    SELECT
+      to AS wallet,
+      MIN(evt_block_time) AS first_buy_time
+    FROM
+      erc20_{{chain}}.evt_transfer
+    WHERE
+      contract_address = {{token}}
+      AND to IN (SELECT wallet FROM initial_wallets)
+    GROUP BY
+      to
+    HAVING
+      MIN(evt_block_time) BETWEEN TIMESTAMP '2024-06-01 00:00:00' AND TIMESTAMP '2024-06-30 23:59:59'
+),
+buys AS (
+    SELECT
+      evt_block_time AS timestamp,
+      to AS buyer,
+      SUM(value / POW(10, {{decimals}})) AS amount_bought
+    FROM
+      erc20_{{chain}}.evt_transfer
+    WHERE
+      contract_address = {{token}}
+      AND to IN (SELECT wallet FROM first_buys)
+    GROUP BY
+      evt_block_time, to
+),
+sells AS (
+    SELECT
+      evt_block_time AS timestamp,
+      "from" AS seller,
+      SUM(value / POW(10, {{decimals}})) AS amount_sold
+    FROM
+      erc20_{{chain}}.evt_transfer
+    WHERE
+      contract_address = {{token}}
+      AND "from" IN (SELECT wallet FROM first_buys)
+    GROUP BY
+      evt_block_time, "from"
+),
+combined AS (
+    SELECT
+      COALESCE(buys.timestamp, sells.timestamp) AS timestamp,
+      COALESCE(buys.buyer, sells.seller) AS wallet,
+      COALESCE(buys.amount_bought, 0) - COALESCE(sells.amount_sold, 0) AS flow
+    FROM
+      buys
+    FULL OUTER JOIN sells 
+    ON buys.timestamp = sells.timestamp 
+    AND buys.buyer = sells.seller
+)
+SELECT
+  timestamp,
+  SUM(flow) AS balance,
+  SUM(SUM(flow)) OVER (ORDER BY timestamp) AS cumulative_balance,
+  (SUM(SUM(flow)) OVER (ORDER BY timestamp)) / (SELECT supply FROM total_supply) AS supply_percentage 
+FROM
+  combined
+GROUP BY
+  timestamp
+ORDER BY
+  timestamp ASC;
+

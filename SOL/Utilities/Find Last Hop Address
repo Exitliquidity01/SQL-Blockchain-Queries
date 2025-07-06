@@ -1,0 +1,13 @@
+SELECT 
+    account_from,
+    account_to,
+    lamports / 1e9 AS amount,
+    call_block_time,
+    call_tx_id
+FROM
+    system_program_solana.system_program_call_Transfer
+WHERE
+    lamports / 1e9 BETWEEN 591.8 AND 592.0 -- Hay que ajustar el rango para cuadrar el posible desgaste de la cantidad por fees, según nº de txs
+    AND call_block_time BETWEEN TIMESTAMP '2024-11-16 00:00:00' AND TIMESTAMP '2024-11-16 23:59:59' -- Ajusta el rango de tiempo, según veamos como se procede. Si son txs por segundo, con un día bastará. Mejor tirar por bajo e ir expandiendo luego hasta encontrarlo
+ORDER BY 
+    call_block_time DESC;

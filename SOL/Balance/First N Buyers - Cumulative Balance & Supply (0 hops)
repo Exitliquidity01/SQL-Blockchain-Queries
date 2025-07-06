@@ -1,0 +1,85 @@
+WITH MintingAddresses AS (
+    SELECT
+        to_owner AS wallet_address
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+), 
+
+TotalSupply AS (
+    SELECT
+       amount / POW(10,{{decimals}}) AS total_supply
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+        Order by block_time asc
+        LIMIT 1 
+),
+
+InitialTransfers AS (
+    SELECT DISTINCT wallet_address
+    FROM (
+        SELECT 
+            trader_id AS wallet_address
+        FROM
+            dex_solana.trades
+        WHERE
+            token_bought_mint_address = '{{token}}'
+            AND trader_id NOT IN (select wallet_address from MintingAddresses)
+        ORDER BY 
+            block_time ASC
+        LIMIT {{N_buyers}}
+    ) AS snipers
+),
+
+
+WalletActivity AS (
+    SELECT
+        block_time,
+        to_owner AS wallet_address,
+        SUM(amount) AS balance_change
+    FROM
+        tokens_solana.transfers
+    WHERE
+        token_mint_address = '{{token}}'
+        AND to_owner IN (SELECT wallet_address FROM InitialTransfers)
+    GROUP BY
+        block_time, to_owner
+
+    UNION ALL
+    
+    SELECT
+        block_time,
+        from_owner AS wallet_address,
+        SUM(-amount) AS balance_change
+    FROM
+        tokens_solana.transfers
+    WHERE
+        token_mint_address = '{{token}}'
+        AND from_owner IN (SELECT wallet_address FROM InitialTransfers)
+    GROUP BY
+        block_time, from_owner
+),
+
+AccumulatedBalances AS (
+    SELECT
+        block_time,
+        SUM(balance_change) OVER (ORDER BY block_time ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_balance
+    FROM
+        WalletActivity
+)
+
+SELECT
+    ab.block_time AS "Block Time",
+    ab.cumulative_balance / POW(10, {{decimals}}) AS "Cumulative Balance (in Tokens)",
+    (ab.cumulative_balance / POW(10, {{decimals}})) / ts.total_supply AS "Cumulative Supply"
+FROM
+    AccumulatedBalances ab
+CROSS JOIN
+    TotalSupply ts
+ORDER BY
+    ab.block_time ASC;

@@ -1,0 +1,137 @@
+WITH MintingAddresses AS (
+    SELECT DISTINCT
+        to_owner AS wallet_address
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        from_owner IS NULL
+),
+
+-- $WAP
+Token1FromOwner AS (
+    SELECT 
+        from_owner AS wallet_address,
+        block_time,
+        tx_id
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        block_time BETWEEN TIMESTAMP '2024-07-15 20:05:00 UTC' AND TIMESTAMP '2024-07-16 04:00:00 UTC'
+        AND token_mint_address = '{{token1}}'
+),
+
+Token1ToOwner AS (
+    SELECT 
+        to_owner AS wallet_address,
+        block_time,
+        tx_id
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        block_time BETWEEN TIMESTAMP '2024-07-15 20:05:00 UTC' AND TIMESTAMP '2024-07-16 04:00:00 UTC'
+        AND token_mint_address = '{{token1}}'
+),
+
+Token1Combined AS (
+    SELECT * FROM Token1FromOwner
+    UNION DISTINCT
+    SELECT * FROM Token1ToOwner
+),
+
+Token1FirstTx AS (
+    SELECT 
+        wallet_address,
+        MIN(block_time) AS first_tx_blocktime
+    FROM 
+        Token1Combined
+    GROUP BY 
+        wallet_address
+),
+
+Token1Final AS (
+    SELECT 
+        t1.wallet_address,
+        t1.block_time AS blocktime_token1,
+        t1.tx_id AS tx_id_token1,
+        (SELECT COUNT(*) FROM Token1Combined WHERE wallet_address = t1.wallet_address) AS tx_count_token1
+    FROM 
+        Token1Combined t1
+    JOIN 
+        Token1FirstTx ft1 ON t1.wallet_address = ft1.wallet_address 
+                        AND t1.block_time = ft1.first_tx_blocktime
+),
+
+-- $CAFE
+Token2FromOwner AS (
+    SELECT 
+        from_owner AS wallet_address,
+        block_time,
+        tx_id
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        block_time BETWEEN TIMESTAMP '2024-10-14 18:19:00 UTC' AND TIMESTAMP '2024-10-15 12:00:00 UTC'
+        AND token_mint_address = '{{token2}}'
+),
+
+Token2ToOwner AS (
+    SELECT 
+        to_owner AS wallet_address,
+        block_time,
+        tx_id
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        block_time BETWEEN TIMESTAMP '2024-10-14 18:19:00 UTC' AND TIMESTAMP '2024-10-15 12:00:00 UTC'
+        AND token_mint_address = '{{token2}}'
+),
+
+Token2Combined AS (
+    SELECT * FROM Token2FromOwner
+    UNION DISTINCT
+    SELECT * FROM Token2ToOwner
+),
+
+Token2FirstTx AS (
+    SELECT 
+        wallet_address,
+        MIN(block_time) AS first_tx_blocktime
+    FROM 
+        Token2Combined
+    GROUP BY 
+        wallet_address
+),
+
+Token2Final AS (
+    SELECT 
+        t2.wallet_address,
+        t2.block_time AS blocktime_token2,
+        t2.tx_id AS tx_id_token2,
+        (SELECT COUNT(*) FROM Token2Combined WHERE wallet_address = t2.wallet_address) AS tx_count_token2
+    FROM 
+        Token2Combined t2
+    JOIN 
+        Token2FirstTx ft2 ON t2.wallet_address = ft2.wallet_address 
+                        AND t2.block_time = ft2.first_tx_blocktime
+)
+
+
+
+-- JUNTO TABLAS
+SELECT 
+    t1.wallet_address,
+    t1.blocktime_token1 AS Block_time_WAP,
+    '<a href="https://solscan.io/tx/' || CAST(t1.tx_id_token1 AS VARCHAR) || '" target="_blank">View Tx Token1</a>' AS tx_link_WAP,
+    t1.tx_count_token1 AS total_tx_count_WAP,
+    t2.blocktime_token2 AS Block_time_CAFE,
+    '<a href="https://solscan.io/tx/' || CAST(t2.tx_id_token2 AS VARCHAR) || '" target="_blank">View Tx Token2</a>' AS tx_link_CAFE,
+    t2.tx_count_token2 AS total_tx_count_CAFE
+   
+FROM 
+    Token1Final t1
+JOIN 
+    Token2Final t2 ON t1.wallet_address = t2.wallet_address
+
+ORDER BY 
+    t1.blocktime_token1 ASC;
+

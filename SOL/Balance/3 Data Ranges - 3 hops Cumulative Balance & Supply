@@ -1,0 +1,419 @@
+WITH MintingAddresses AS (
+    SELECT
+        to_owner AS wallet_address
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+),
+
+TotalSupply AS (
+    SELECT
+       amount / POW(10,{{decimals}}) AS total_supply
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+        ORDER BY block_time ASC
+        LIMIT 1 
+),
+
+
+Instance1 AS (
+    WITH InitialTransfers AS (
+        SELECT DISTINCT
+        wallet_address
+    FROM (
+        SELECT 
+            trader_id AS wallet_address,
+            MIN(block_time) AS first_tx_time
+        FROM
+            dex_solana.trades
+        WHERE
+            token_bought_mint_address = '{{token}}'
+        GROUP BY
+            trader_id
+        HAVING
+            MIN(block_time) BETWEEN TIMESTAMP '2024-10-06 23:14:01 UTC' AND TIMESTAMP '2024-10-07 16:30:00 UTC'
+    ) AS filtered_wallets
+),
+    
+    OutflowWallets AS (
+        SELECT DISTINCT
+            ts.to_owner AS wallet_address
+        FROM
+            tokens_solana.transfers ts
+        JOIN
+            InitialTransfers it ON ts.from_owner = it.wallet_address
+        WHERE
+            ts.token_mint_address = '{{token}}'
+    ),
+    FilteredOutflowWallets AS (
+        SELECT
+            ow.wallet_address
+        FROM
+            OutflowWallets ow
+        WHERE
+            ow.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ),
+    Level2OutflowWallets AS (
+        SELECT DISTINCT
+            ts.to_owner AS wallet_address
+        FROM
+            tokens_solana.transfers ts
+        JOIN
+            FilteredOutflowWallets fo ON ts.from_owner = fo.wallet_address
+        WHERE
+            ts.token_mint_address = '{{token}}'
+    ),
+    FilteredLevel2OutflowWallets AS (
+        SELECT
+            lw.wallet_address
+        FROM
+            Level2OutflowWallets lw
+        WHERE
+            lw.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ),
+    Level3OutflowWallets AS (
+        SELECT DISTINCT
+            ts.to_owner AS wallet_address
+        FROM
+            tokens_solana.transfers ts
+        JOIN
+            FilteredLevel2OutflowWallets l2w ON ts.from_owner = l2w.wallet_address
+        WHERE
+            ts.token_mint_address = '{{token}}'
+    ),
+    FilteredLevel3OutflowWallets AS (
+        SELECT
+            l3w.wallet_address
+        FROM
+            Level3OutflowWallets l3w
+        WHERE
+            l3w.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ),
+    CombinedWallets AS (
+        SELECT wallet_address FROM InitialTransfers
+        UNION DISTINCT
+        SELECT wallet_address FROM FilteredOutflowWallets
+        UNION DISTINCT
+        SELECT wallet_address FROM FilteredLevel2OutflowWallets
+        UNION DISTINCT
+        SELECT wallet_address FROM FilteredLevel3OutflowWallets
+    ),
+    WalletActivity AS (
+        SELECT
+            ts.block_time,
+            ts.to_owner AS wallet_address,
+            SUM(ts.amount) AS balance_change
+        FROM
+            tokens_solana.transfers ts
+        WHERE
+            ts.token_mint_address = '{{token}}'
+            AND ts.to_owner IN (SELECT wallet_address FROM CombinedWallets)
+        GROUP BY
+            ts.block_time, ts.to_owner
+
+        UNION ALL
+        
+        SELECT
+            ts.block_time,
+            ts.from_owner AS wallet_address,
+            SUM(-ts.amount) AS balance_change
+        FROM
+            tokens_solana.transfers ts
+        WHERE
+            ts.token_mint_address = '{{token}}'
+            AND ts.from_owner IN (SELECT wallet_address FROM CombinedWallets)
+        GROUP BY
+            ts.block_time, ts.from_owner
+    ),
+    AccumulatedBalances AS (
+        SELECT
+            block_time,
+            SUM(balance_change) OVER (ORDER BY block_time ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_balance
+        FROM
+            WalletActivity
+    )
+    SELECT
+        ab.block_time AS "Block Time",
+        ab.cumulative_balance / POW(10, {{decimals}}) AS "Cumulative Balance 1 (in Tokens)",
+        (ab.cumulative_balance / POW(10, {{decimals}})) / ts.total_supply AS "Cumulative Supply 1"
+    FROM
+        AccumulatedBalances ab
+    CROSS JOIN
+        TotalSupply ts
+),
+
+
+  Instance2 AS (
+    WITH InitialTransfers AS (
+       SELECT DISTINCT
+        wallet_address
+    FROM (
+        SELECT 
+            trader_id AS wallet_address,
+            MIN(block_time) AS first_tx_time
+        FROM
+            dex_solana.trades
+        WHERE
+            token_bought_mint_address = '{{token}}'
+        GROUP BY
+            trader_id
+        HAVING
+            MIN(block_time) BETWEEN TIMESTAMP '2024-10-07 16:30:01 UTC' AND TIMESTAMP '2024-10-10 15:00:00 UTC'
+    ) AS filtered_wallets
+    ),
+    OutflowWallets AS (
+        SELECT DISTINCT
+            ts.to_owner AS wallet_address
+        FROM
+            tokens_solana.transfers ts
+        JOIN
+            InitialTransfers it ON ts.from_owner = it.wallet_address
+        WHERE
+            ts.token_mint_address = '{{token}}'
+    ),
+    FilteredOutflowWallets AS (
+        SELECT
+            ow.wallet_address
+        FROM
+            OutflowWallets ow
+        WHERE
+            ow.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ),
+    Level2OutflowWallets AS (
+        SELECT DISTINCT
+            ts.to_owner AS wallet_address
+        FROM
+            tokens_solana.transfers ts
+        JOIN
+            FilteredOutflowWallets fo ON ts.from_owner = fo.wallet_address
+        WHERE
+            ts.token_mint_address = '{{token}}'
+    ),
+    FilteredLevel2OutflowWallets AS (
+        SELECT
+            lw.wallet_address
+        FROM
+            Level2OutflowWallets lw
+        WHERE
+            lw.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ),
+    Level3OutflowWallets AS (
+        SELECT DISTINCT
+            ts.to_owner AS wallet_address
+        FROM
+            tokens_solana.transfers ts
+        JOIN
+            FilteredLevel2OutflowWallets l2w ON ts.from_owner = l2w.wallet_address
+        WHERE
+            ts.token_mint_address = '{{token}}'
+    ),
+    FilteredLevel3OutflowWallets AS (
+        SELECT
+            l3w.wallet_address
+        FROM
+            Level3OutflowWallets l3w
+        WHERE
+            l3w.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ),
+    CombinedWallets AS (
+        SELECT wallet_address FROM InitialTransfers
+        UNION DISTINCT
+        SELECT wallet_address FROM FilteredOutflowWallets
+        UNION DISTINCT
+        SELECT wallet_address FROM FilteredLevel2OutflowWallets
+        UNION DISTINCT
+        SELECT wallet_address FROM FilteredLevel3OutflowWallets
+    ),
+    WalletActivity AS (
+        SELECT
+            ts.block_time,
+            ts.to_owner AS wallet_address,
+            SUM(ts.amount) AS balance_change
+        FROM
+            tokens_solana.transfers ts
+        WHERE
+            ts.token_mint_address = '{{token}}'
+            AND ts.to_owner IN (SELECT wallet_address FROM CombinedWallets)
+        GROUP BY
+            ts.block_time, ts.to_owner
+
+        UNION ALL
+        
+        SELECT
+            ts.block_time,
+            ts.from_owner AS wallet_address,
+            SUM(-ts.amount) AS balance_change
+        FROM
+            tokens_solana.transfers ts
+        WHERE
+            ts.token_mint_address = '{{token}}'
+            AND ts.from_owner IN (SELECT wallet_address FROM CombinedWallets)
+        GROUP BY
+            ts.block_time, ts.from_owner
+    ),
+    AccumulatedBalances AS (
+        SELECT
+            block_time,
+            SUM(balance_change) OVER (ORDER BY block_time ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_balance
+        FROM
+            WalletActivity
+    )
+    SELECT
+        ab.block_time AS "Block Time",
+        ab.cumulative_balance / POW(10, {{decimals}}) AS "Cumulative Balance 2 (in Tokens)",
+        (ab.cumulative_balance / POW(10, {{decimals}})) / ts.total_supply AS "Cumulative Supply 2"
+    FROM
+        AccumulatedBalances ab
+    CROSS JOIN
+        TotalSupply ts
+),
+
+-- Tercera instancia de la consulta
+Instance3 AS (
+
+    WITH InitialTransfers AS (
+     SELECT DISTINCT
+        wallet_address
+    FROM (
+        SELECT 
+            trader_id AS wallet_address,
+            MIN(block_time) AS first_tx_time
+        FROM
+            dex_solana.trades
+        WHERE
+            token_bought_mint_address = '{{token}}'
+        GROUP BY
+            trader_id
+        HAVING
+            MIN(block_time) BETWEEN TIMESTAMP '2024-10-11 17:00:00' AND TIMESTAMP '2024-10-13 14:59:00'
+    ) AS filtered_wallets
+    ),
+    OutflowWallets AS (
+        SELECT DISTINCT
+            ts.to_owner AS wallet_address
+        FROM
+            tokens_solana.transfers ts
+        JOIN
+            InitialTransfers it ON ts.from_owner = it.wallet_address
+        WHERE
+            ts.token_mint_address = '{{token}}'
+    ),
+    FilteredOutflowWallets AS (
+        SELECT
+            ow.wallet_address
+        FROM
+            OutflowWallets ow
+        WHERE
+            ow.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ),
+    Level2OutflowWallets AS (
+        SELECT DISTINCT
+            ts.to_owner AS wallet_address
+        FROM
+            tokens_solana.transfers ts
+        JOIN
+            FilteredOutflowWallets fo ON ts.from_owner = fo.wallet_address
+        WHERE
+            ts.token_mint_address = '{{token}}'
+    ),
+    FilteredLevel2OutflowWallets AS (
+        SELECT
+            lw.wallet_address
+        FROM
+            Level2OutflowWallets lw
+        WHERE
+            lw.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ),
+    Level3OutflowWallets AS (
+        SELECT DISTINCT
+            ts.to_owner AS wallet_address
+        FROM
+            tokens_solana.transfers ts
+        JOIN
+            FilteredLevel2OutflowWallets l2w ON ts.from_owner = l2w.wallet_address
+        WHERE
+            ts.token_mint_address = '{{token}}'
+    ),
+    FilteredLevel3OutflowWallets AS (
+        SELECT
+            l3w.wallet_address
+        FROM
+            Level3OutflowWallets l3w
+        WHERE
+            l3w.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ),
+    CombinedWallets AS (
+        SELECT wallet_address FROM InitialTransfers
+        UNION DISTINCT
+        SELECT wallet_address FROM FilteredOutflowWallets
+        UNION DISTINCT
+        SELECT wallet_address FROM FilteredLevel2OutflowWallets
+        UNION DISTINCT
+        SELECT wallet_address FROM FilteredLevel3OutflowWallets
+    ),
+    WalletActivity AS (
+        SELECT
+            ts.block_time,
+            ts.to_owner AS wallet_address,
+            SUM(ts.amount) AS balance_change
+        FROM
+            tokens_solana.transfers ts
+        WHERE
+            ts.token_mint_address = '{{token}}'
+            AND ts.to_owner IN (SELECT wallet_address FROM CombinedWallets)
+        GROUP BY
+            ts.block_time, ts.to_owner
+
+        UNION ALL
+        
+        SELECT
+            ts.block_time,
+            ts.from_owner AS wallet_address,
+            SUM(-ts.amount) AS balance_change
+        FROM
+            tokens_solana.transfers ts
+        WHERE
+            ts.token_mint_address = '{{token}}'
+            AND ts.from_owner IN (SELECT wallet_address FROM CombinedWallets)
+        GROUP BY
+            ts.block_time, ts.from_owner
+    ),
+    AccumulatedBalances AS (
+        SELECT
+            block_time,
+            SUM(balance_change) OVER (ORDER BY block_time ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_balance
+        FROM
+            WalletActivity
+    )
+    SELECT
+        ab.block_time AS "Block Time",
+        ab.cumulative_balance / POW(10, {{decimals}}) AS "Cumulative Balance 3 (in Tokens)",
+        (ab.cumulative_balance / POW(10, {{decimals}})) / ts.total_supply AS "Cumulative Supply 3"
+    FROM
+        AccumulatedBalances ab
+    CROSS JOIN
+        TotalSupply ts
+)
+
+-- Combinas las tres instancias en una sola tabla
+SELECT 
+    i1."Block Time",
+    i1."Cumulative Balance 1 (in Tokens)",
+    i1."Cumulative Supply 1",
+    i2."Cumulative Balance 2 (in Tokens)",
+    i2."Cumulative Supply 2",
+    i3."Cumulative Balance 3 (in Tokens)",
+    i3."Cumulative Supply 3"
+FROM 
+    Instance1 i1
+JOIN 
+    Instance2 i2 ON i1."Block Time" = i2."Block Time"
+JOIN 
+    Instance3 i3 ON i1."Block Time" = i3."Block Time"
+ORDER BY 
+    i1."Block Time" ASC;

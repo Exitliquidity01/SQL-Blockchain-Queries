@@ -1,0 +1,102 @@
+WITH total_supply AS (
+ 
+    SELECT 
+        value / POW(10, {{decimals}}) AS supply
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+    ORDER BY 
+        evt_block_time ASC
+    LIMIT 1
+),
+buys_combined AS (
+ 
+    SELECT 
+        to AS wallet,
+        SUM(CASE 
+            WHEN DATE(evt_block_time) BETWEEN DATE('{{00Buy_A}}') AND DATE('{{00Buy_B}}') THEN value / POW(10, {{decimals}}) ELSE 0
+        END) AS amount_bought_01,
+        SUM(CASE 
+            WHEN DATE(evt_block_time) BETWEEN DATE('{{01Buy_A}}') AND DATE('{{01Buy_B}}') THEN value / POW(10, {{decimals}}) ELSE 0
+        END) AS amount_bought_02,
+        SUM(CASE 
+            WHEN DATE(evt_block_time) BETWEEN DATE('{{00Buy_A}}') AND DATE('{{00Buy_B}}')
+            OR DATE(evt_block_time) BETWEEN DATE('{{01Buy_A}}') AND DATE('{{01Buy_B}}')
+            THEN value / POW(10, {{decimals}}) ELSE 0
+        END) AS total_bought
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND to NOT IN (SELECT address FROM ethereum.creation_traces)
+    GROUP BY to
+),
+sells_combined AS (
+
+    SELECT 
+        "from" AS wallet,
+        SUM(CASE 
+            WHEN DATE(evt_block_time) BETWEEN DATE('{{02Sell_A}}') AND DATE('{{02Sell_B}}') THEN value / POW(10, {{decimals}}) ELSE 0
+        END) AS amount_sold_01,
+        SUM(CASE 
+            WHEN DATE(evt_block_time) BETWEEN DATE('{{03Sell_A}}') AND DATE('{{03Sell_B}}') THEN value / POW(10, {{decimals}}) ELSE 0
+        END) AS amount_sold_02,
+        SUM(CASE 
+            WHEN DATE(evt_block_time) BETWEEN DATE('{{02Sell_A}}') AND DATE('{{02Sell_B}}')
+            OR DATE(evt_block_time) BETWEEN DATE('{{03Sell_A}}') AND DATE('{{03Sell_B}}')
+            THEN value / POW(10, {{decimals}}) ELSE 0
+        END) AS total_sold
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND "from" NOT IN (SELECT address FROM ethereum.creation_traces)
+    GROUP BY "from"
+),
+wallet_balances AS (
+
+    SELECT 
+        to AS wallet, 
+        SUM(value / POW(10, {{decimals}})) AS balance_received
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+    GROUP BY to
+    UNION ALL
+    SELECT 
+        "from" AS wallet, 
+        -SUM(value / POW(10, {{decimals}})) AS balance_sent
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+    GROUP BY "from"
+),
+final_wallet_balances AS (
+
+    SELECT 
+        wallet,
+        SUM(balance_received) AS total_balance
+    FROM 
+        wallet_balances
+    GROUP BY wallet
+)
+SELECT
+    '<a href="https://debank.com/profile/' || CAST(fwb.wallet AS VARCHAR) || '" target="_blank">' || CAST(fwb.wallet AS VARCHAR) || '</a>' AS wallet,
+    fwb.total_balance AS "Total Balance",
+    COALESCE(bc.amount_bought_01, 0) AS "Bought in Range 01",
+    COALESCE(bc.amount_bought_02, 0) AS "Bought in Range 02",
+    COALESCE(sc.amount_sold_01, 0) AS "Sold in Range 01",
+    COALESCE(sc.amount_sold_02, 0) AS "Sold in Range 02",
+    COALESCE(bc.total_bought, 0) AS "Total Bought",
+    COALESCE(sc.total_sold, 0) AS "Total Sold",
+    (fwb.total_balance / (SELECT supply FROM total_supply)) AS "% Supply"
+FROM
+    final_wallet_balances fwb
+LEFT JOIN buys_combined bc ON fwb.wallet = bc.wallet
+LEFT JOIN sells_combined sc ON fwb.wallet = sc.wallet
+WHERE 
+    (bc.total_bought > 0 AND sc.total_sold > 0)
+ORDER BY fwb.total_balance DESC;

@@ -1,0 +1,77 @@
+WITH 
+  total_supply AS (
+   
+    SELECT 
+      value / POW(10, {{decimals}}) AS supply
+    FROM 
+      erc20_ethereum.evt_transfer
+    WHERE 
+      contract_address = {{token}}
+    ORDER BY 
+      evt_block_time ASC
+    LIMIT 1
+  ),
+  buys AS (
+    SELECT
+      DATE_TRUNC('hour', evt_block_time) AS timestamp,
+      to AS buyer,
+      SUM(value / POW(10, {{decimals}})) AS amount_bought
+    FROM
+      erc20_ethereum.evt_transfer AS a
+      LEFT JOIN tokens.erc20 AS b ON a.contract_address = b.contract_address
+      AND blockchain = 'ethereum'
+    WHERE
+      a.contract_address = {{token}}
+      AND to NOT IN (
+        SELECT address FROM ethereum.creation_traces
+      )
+      AND to <> 0x0000000000000000000000000000000000000000
+      AND to <> 0x000000000000000000000000000000000000dead
+      AND value IS NOT NULL
+    GROUP BY
+      1, 2
+  ),
+  sells AS (
+    SELECT
+      DATE_TRUNC('hour', evt_block_time) AS timestamp,
+      "from" AS seller,
+      SUM(value / POW(10, {{decimals}})) AS amount_sold
+    FROM
+      erc20_ethereum.evt_transfer AS a
+      LEFT JOIN tokens.erc20 AS b ON a.contract_address = b.contract_address
+      AND blockchain = 'ethereum'
+    WHERE
+      a.contract_address = {{token}}
+      AND "from" <> 0x0000000000000000000000000000000000000000
+      AND value IS NOT NULL
+    GROUP BY
+      1, 2
+  ),
+  combined AS (
+    SELECT
+      COALESCE(a.timestamp, b.timestamp) AS timestamp,
+      COALESCE(a.buyer, b.seller) AS holder,
+      COALESCE(amount_bought, 0) - COALESCE(amount_sold, 0) AS flow
+    FROM
+      buys AS a
+    FULL OUTER JOIN sells AS b 
+      ON a.timestamp = b.timestamp 
+      AND a.buyer = b.seller
+  )
+SELECT
+  timestamp,
+  SUM(SUM(flow)) OVER (ORDER BY timestamp) AS balance,
+  (SUM(SUM(flow)) OVER (ORDER BY timestamp)) / (SELECT supply FROM total_supply) AS "% Supply"
+FROM
+  combined
+WHERE
+  holder IN (
+   -- LIST SEPARATED BY COMA --
+  )
+  AND holder NOT IN (
+    SELECT address FROM ethereum.creation_traces
+  )
+GROUP BY
+  timestamp
+ORDER BY
+  timestamp ASC;

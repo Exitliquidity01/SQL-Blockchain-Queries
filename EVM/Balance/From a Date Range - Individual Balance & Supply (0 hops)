@@ -1,0 +1,97 @@
+WITH 
+total_supply AS (
+    SELECT 
+        to AS Team_wallet,
+        value / POW(10, {{decimals}}) AS supply
+    FROM 
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+    ORDER BY 
+        evt_block_time ASC
+    LIMIT 1
+),
+initial_wallets AS (
+    SELECT DISTINCT
+        to AS wallet
+    FROM
+        erc20_{{chain}}.evt_transfer
+    WHERE
+        contract_address = {{token}}
+        AND evt_block_time BETWEEN TIMESTAMP '2024-04-25 00:00:00' AND TIMESTAMP '2024-04-26 06:00:00'
+        AND to NOT IN (SELECT address FROM {{chain}}.creation_traces)
+        AND to NOT IN (SELECT Team_wallet FROM total_supply)
+        AND to NOT IN (0x000000000000000000000000000000000000dead, 0x0000000000000000000000000000000000000000)
+),
+buys AS (
+    SELECT
+        to AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS amount_bought
+    FROM
+        erc20_{{chain}}.evt_transfer
+    WHERE
+        contract_address = {{token}}
+        AND to IN (SELECT wallet FROM initial_wallets)
+    GROUP BY to
+),
+sells AS (
+    SELECT
+        "from" AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS amount_sold
+    FROM
+        erc20_{{chain}}.evt_transfer
+    WHERE
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM initial_wallets)
+    GROUP BY "from"
+),
+last_24h_buys AS (
+    SELECT
+        to AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS amount_bought_last_24h
+    FROM 
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND evt_block_time >= NOW() - INTERVAL '24' HOUR
+    GROUP BY to
+),
+last_24h_sells AS (
+    SELECT
+        "from" AS wallet,
+        -SUM(value / POW(10, {{decimals}})) AS amount_sold_last_24h
+    FROM 
+        erc20_{{chain}}.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND evt_block_time >= NOW() - INTERVAL '24' HOUR
+    GROUP BY "from"
+),
+wallet_changes AS (
+    SELECT 
+        COALESCE(b.wallet, s.wallet) AS wallet,
+        COALESCE(b.amount_bought_last_24h, 0) AS total_bought_24h,
+        COALESCE(s.amount_sold_last_24h, 0) AS total_sold_24h
+    FROM 
+        last_24h_buys b
+    FULL OUTER JOIN last_24h_sells s ON b.wallet = s.wallet
+),
+final_balances AS (
+    SELECT
+        COALESCE(buys.wallet, sells.wallet) AS wallet,
+        COALESCE(buys.amount_bought, 0) - COALESCE(sells.amount_sold, 0) AS balance
+    FROM
+        buys
+    FULL OUTER JOIN sells ON buys.wallet = sells.wallet
+)
+SELECT
+    fb.wallet,
+    fb.balance AS balance,
+    fb.balance / ts.supply AS supply_percentage,
+    COALESCE(wc.total_bought_24h, 0) - COALESCE(wc.total_sold_24h, 0) AS change_last_24h,
+    (COALESCE(wc.total_bought_24h, 0) - COALESCE(wc.total_sold_24h, 0)) / ts.supply AS percentage_change_last_24h
+FROM 
+    final_balances fb
+CROSS JOIN total_supply ts
+LEFT JOIN wallet_changes wc ON fb.wallet = wc.wallet
+ORDER BY fb.balance DESC;

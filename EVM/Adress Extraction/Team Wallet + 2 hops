@@ -1,0 +1,63 @@
+WITH 
+team_wallet AS (
+  SELECT 
+    to AS wallet
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+  ORDER BY 
+    evt_block_time ASC
+  LIMIT 1
+),
+level_1 AS (
+  SELECT 
+    to AS wallet
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+    AND "from" IN (SELECT wallet FROM team_wallet)
+    AND to NOT IN (SELECT address FROM {{chain}}.creation_traces)
+  GROUP BY 
+    to
+),
+level_2 AS (
+  SELECT 
+    e.to AS wallet
+  FROM 
+    erc20_{{chain}}.evt_transfer e
+  JOIN 
+    level_1 l1 ON e."from" = l1.wallet
+  WHERE 
+    e.contract_address = {{token}}
+    AND e.to NOT IN (SELECT address FROM {{chain}}.creation_traces)
+  GROUP BY 
+    e.to
+),
+wallet_balances AS (
+  SELECT 
+    to AS wallet
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+    AND to IN (SELECT wallet FROM level_1 UNION DISTINCT SELECT wallet FROM level_2 UNION DISTINCT SELECT wallet FROM team_wallet)
+  UNION DISTINCT
+  SELECT 
+    "from" AS wallet
+  FROM 
+    erc20_{{chain}}.evt_transfer
+  WHERE 
+    contract_address = {{token}}
+    AND "from" IN (SELECT wallet FROM level_1 UNION DISTINCT SELECT wallet FROM level_2 UNION DISTINCT SELECT wallet FROM team_wallet)
+)
+SELECT 
+  wallet
+FROM 
+  (SELECT * FROM level_1 UNION DISTINCT SELECT * FROM level_2 UNION DISTINCT SELECT * FROM team_wallet) AS l
+ORDER BY 
+  CASE 
+    WHEN l.wallet = (SELECT wallet FROM team_wallet) THEN 0  
+    ELSE 1  
+  END;

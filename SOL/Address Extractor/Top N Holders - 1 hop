@@ -1,0 +1,105 @@
+
+WITH 
+
+tokens_received AS (
+    SELECT 
+        to_owner AS wallet,
+        SUM(amount / POW(10, {{decimals}})) AS tokens_received
+    FROM
+        tokens_solana.transfers
+    WHERE
+        token_mint_address = '{{token}}'
+    GROUP BY
+        to_owner
+),
+
+tokens_sent AS (
+    SELECT
+        from_owner AS wallet,
+        SUM(amount / POW(10, {{decimals}})) AS tokens_sent
+    FROM
+        tokens_solana.transfers
+    WHERE
+        token_mint_address = '{{token}}'
+    GROUP BY
+        from_owner
+),
+
+wallet_balances AS (
+    SELECT
+        COALESCE(tr.wallet, ts.wallet) AS wallet,
+        COALESCE(tr.tokens_received, 0) - COALESCE(ts.tokens_sent, 0) AS balance
+    FROM
+        tokens_received tr
+    FULL OUTER JOIN
+        tokens_sent ts ON tr.wallet = ts.wallet
+),
+
+MintingAddresses AS (
+    SELECT
+        to_owner AS wallet_address
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+), 
+
+TotalSupply AS (
+    SELECT
+       SUM(amount) / POW(10, {{decimals}}) AS total_supply
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+),
+
+
+FilteredWallets AS (
+    SELECT 
+        wallet,
+        balance
+    FROM
+        wallet_balances
+    WHERE
+        wallet NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ORDER BY
+        balance DESC
+    LIMIT {{N}}
+),
+
+
+OutflowWallets AS (
+    SELECT DISTINCT
+        ts.to_owner AS wallet
+    FROM
+        tokens_solana.transfers ts
+    JOIN
+        FilteredWallets fw ON ts.from_owner = fw.wallet
+    WHERE
+        ts.token_mint_address = '{{token}}'
+        AND  ts.to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+),
+
+
+CombinedWallets AS (
+    SELECT wallet FROM FilteredWallets
+    UNION DISTINCT
+    SELECT wallet FROM OutflowWallets
+)
+
+
+SELECT
+   cw.wallet
+ 
+FROM
+    CombinedWallets cw
+LEFT JOIN
+    tokens_received tr ON cw.wallet = tr.wallet
+LEFT JOIN
+    tokens_sent ts ON cw.wallet = ts.wallet
+CROSS JOIN
+    TotalSupply ts
+GROUP BY
+    cw.wallet, ts.total_supply

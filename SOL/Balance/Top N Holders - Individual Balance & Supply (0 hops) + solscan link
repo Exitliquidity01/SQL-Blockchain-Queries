@@ -1,0 +1,80 @@
+WITH 
+
+tokens_received AS (
+    SELECT 
+        to_owner AS wallet,
+        SUM(amount / POW(10, {{decimals}})) AS tokens_received
+    FROM
+        tokens_solana.transfers
+    WHERE
+        token_mint_address = '{{token}}'
+    GROUP BY
+        to_owner
+),
+
+tokens_sent AS (
+    SELECT
+        from_owner AS wallet,
+        SUM(amount / POW(10, {{decimals}})) AS tokens_sent
+    FROM
+        tokens_solana.transfers
+    WHERE
+        token_mint_address = '{{token}}'
+    GROUP BY
+        from_owner
+),
+
+wallet_balances AS (
+    SELECT
+        COALESCE(tr.wallet, ts.wallet) AS wallet,
+        COALESCE(tr.tokens_received, 0) - COALESCE(ts.tokens_sent, 0) AS balance
+    FROM
+        tokens_received tr
+    FULL OUTER JOIN
+        tokens_sent ts ON tr.wallet = ts.wallet
+),
+
+MintingAddresses AS (
+    SELECT
+        to_owner AS wallet_address
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+), 
+
+TotalSupply AS (
+    SELECT
+       SUM(amount) / POW(10, {{decimals}}) AS total_supply
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+),
+
+FilteredWallets AS (
+    SELECT 
+        wallet,
+        balance
+    FROM
+        wallet_balances
+    WHERE
+        wallet NOT IN (SELECT wallet_address FROM MintingAddresses)
+    ORDER BY
+        balance DESC
+    LIMIT {{N}}
+)
+
+SELECT
+    '<a href="https://solscan.io/account/' || fw.wallet || '?cluster=mainnet-beta" target="_blank">' || fw.wallet || '</a>' AS "Wallet (Solscan Link)",
+    fw.balance AS "Balance (in Tokens)",
+    (fw.balance / ts.total_supply) AS "Percentage of Total Supply"
+FROM
+    FilteredWallets fw
+CROSS JOIN
+    TotalSupply ts
+ORDER BY
+    fw.balance DESC
+LIMIT {{N}};

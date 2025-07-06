@@ -1,0 +1,82 @@
+WITH daily_wallet_changes AS (
+    SELECT
+        date_trunc('day', evt_block_time) AS date,
+        "to" AS wallet,
+        value AS change
+    FROM erc20_ethereum.evt_Transfer
+    WHERE contract_address = {{token}}
+    
+    UNION ALL
+    
+    SELECT
+        date_trunc('day', evt_block_time) AS date,
+        "from" AS wallet,
+        -value AS change
+    FROM erc20_ethereum.evt_Transfer
+    WHERE contract_address = {{token}}
+),
+daily_wallet_status AS (
+    SELECT
+        date,
+        wallet,
+        SUM(change) AS daily_balance_change
+    FROM daily_wallet_changes
+    GROUP BY 1, 2
+),
+cumulative_wallet_status AS (
+    SELECT
+        date,
+        wallet,
+        SUM(daily_balance_change) OVER (PARTITION BY wallet ORDER BY date) AS cumulative_balance
+    FROM daily_wallet_status
+),
+wallet_status_with_prev AS (
+    SELECT
+        date,
+        wallet,
+        cumulative_balance,
+        LAG(cumulative_balance) OVER (PARTITION BY wallet ORDER BY date) AS previous_cumulative_balance
+    FROM cumulative_wallet_status
+),
+daily_counts AS (
+    SELECT
+        date,
+        COUNT(DISTINCT CASE WHEN cumulative_balance > 0 AND (previous_cumulative_balance IS NULL OR previous_cumulative_balance <= 0) THEN wallet END) AS new_or_reactivated_wallets,
+        COUNT(DISTINCT CASE WHEN cumulative_balance <= 0 AND previous_cumulative_balance > 0 THEN wallet END) AS emptied_wallets
+    FROM wallet_status_with_prev
+    GROUP BY date
+),
+Holders_calc AS (
+    SELECT
+        date,
+        SUM(new_or_reactivated_wallets - emptied_wallets) OVER (ORDER BY date) AS Holders
+    FROM daily_counts
+)
+SELECT
+    date,
+    Holders,
+    LAG(Holders, 1) OVER (ORDER BY date) AS holders_24h_ago,
+    LAG(Holders, 2) OVER (ORDER BY date) AS holders_48h_ago,
+    LAG(Holders, 7) OVER (ORDER BY date) AS holders_7d_ago,
+    CASE 
+        WHEN LAG(Holders, 1) OVER (ORDER BY date) > 0 THEN 
+            ((Holders - LAG(Holders, 1) OVER (ORDER BY date)) * 100.0 / LAG(Holders, 1) OVER (ORDER BY date)) 
+        ELSE 
+            NULL 
+    END AS percentage_change_24h,
+    CASE 
+        WHEN LAG(Holders, 2) OVER (ORDER BY date) > 0 THEN 
+            ((Holders - LAG(Holders, 2) OVER (ORDER BY date)) * 100.0 / LAG(Holders, 2) OVER (ORDER BY date)) 
+        ELSE 
+            NULL 
+    END AS percentage_change_48h,
+    CASE 
+        WHEN LAG(Holders, 7) OVER (ORDER BY date) > 0 THEN 
+            ((Holders - LAG(Holders, 7) OVER (ORDER BY date)) * 100.0 / LAG(Holders, 7) OVER (ORDER BY date)) 
+        ELSE 
+            NULL 
+    END AS percentage_change_7d
+FROM
+    Holders_calc
+ORDER BY
+    date desc;

@@ -1,0 +1,86 @@
+WITH MintingAddresses AS (
+    SELECT DISTINCT
+        to_owner AS wallet_address
+    FROM
+        tokens_solana.transfers
+    WHERE
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+),
+
+InitialList AS (
+    SELECT DISTINCT
+        wallet_address
+    FROM (
+        VALUES 
+           ('CB2o4peiNoCCBx7XL9VGN6tbRnq3cB1u4Aoj4G9515z5'),
+           -- Añadir aquí el resto de las wallets
+           ('Ho6fHBKRYYWs6zXQvUWJAea92fDKy72z4Tv541dFS973')
+    ) AS provided_list(wallet_address)
+),
+
+Level1Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM InitialList)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+        AND to_owner NOT IN ('d1Cphwh9L82AfJGjWAScFiaW7CedWyjUm9VwsTcmVY4', -- Lista de wallets a excluir
+                             '5uQ8CmC5LNJuooqxiumnXfS5t7yJV3R842y5HYVbtHZE')
+),
+
+Level2Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM Level1Outflow)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+        AND to_owner NOT IN ('d1Cphwh9L82AfJGjWAScFiaW7CedWyjUm9VwsTcmVY4', -- Lista de wallets a excluir
+                             '5uQ8CmC5LNJuooqxiumnXfS5t7yJV3R842y5HYVbtHZE')
+),
+
+Level3Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM Level2Outflow)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+        AND to_owner NOT IN ('d1Cphwh9L82AfJGjWAScFiaW7CedWyjUm9VwsTcmVY4', -- Lista de wallets a excluir
+                             '5uQ8CmC5LNJuooqxiumnXfS5t7yJV3R842y5HYVbtHZE')
+),
+
+Level4Outflow AS (
+    SELECT DISTINCT to_owner AS wallet_address
+    FROM tokens_solana.transfers
+    WHERE from_owner IN (SELECT wallet_address FROM Level3Outflow)
+        AND token_mint_address = '{{token}}'
+        AND to_owner NOT IN (SELECT wallet_address FROM MintingAddresses)
+        AND to_owner NOT IN ('d1Cphwh9L82AfJGjWAScFiaW7CedWyjUm9VwsTcmVY4', -- Lista de wallets a excluir
+                             '5uQ8CmC5LNJuooqxiumnXfS5t7yJV3R842y5HYVbtHZE')
+),
+
+CombinedWallets AS (
+    SELECT wallet_address FROM InitialList
+    UNION DISTINCT
+    SELECT wallet_address FROM Level1Outflow
+    UNION DISTINCT
+    SELECT wallet_address FROM Level2Outflow
+    UNION DISTINCT
+    SELECT wallet_address FROM Level3Outflow
+    UNION DISTINCT
+    SELECT wallet_address FROM Level4Outflow
+)
+
+SELECT
+    cw.wallet_address,
+    COUNT(t.token_mint_address) AS tx_count
+FROM
+    CombinedWallets cw
+LEFT JOIN
+    tokens_solana.transfers t
+ON
+    cw.wallet_address = t.from_owner OR cw.wallet_address = t.to_owner
+GROUP BY
+    cw.wallet_address
+ORDER BY
+    tx_count DESC;

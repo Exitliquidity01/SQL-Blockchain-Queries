@@ -1,0 +1,115 @@
+WITH initial_wallets AS (
+   
+    SELECT *
+    FROM (
+      SELECT DISTINCT
+      to AS wallet
+    FROM
+      erc20_{{chain}}.evt_transfer
+    WHERE
+      contract_address = {{token}}
+     AND evt_block_time BETWEEN TIMESTAMP '2024-10-20 18:00:00' AND TIMESTAMP '2024-10-20 18:02:00'
+      and to NOT IN (SELECT ADDRESS FROM {{chain}}.creation_traces)
+      and to not in (select address from cex.addresses)
+      AND to != 0x0000000000000000000000000000000000000000
+      AND to != 0x000000000000000000000000000000000000dead
+    ) AS initial_wallets(wallet)
+),
+
+total_supply AS (
+ 
+    SELECT 
+        to AS Team_wallet,
+        value / POW(10, {{decimals}}) AS supply
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+    ORDER BY 
+        evt_block_time ASC
+    LIMIT 1
+),
+level_1_in AS (
+   
+    SELECT DISTINCT
+        "from" AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS amount_sent
+    FROM
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND to IN (SELECT wallet FROM initial_wallets)
+        AND "from" NOT IN (SELECT address FROM ethereum.creation_traces)
+        AND "from" NOT IN (0x000000000000000000000000000000000000dead, 0x0000000000000000000000000000000000000000)
+        AND "from" NOT IN (SELECT Team_wallet FROM total_supply)
+    GROUP BY "from"
+),
+level_1_out AS (
+   
+    SELECT DISTINCT
+        to AS wallet,
+        SUM(value / POW(10, {{decimals}})) AS amount_received
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM initial_wallets)
+        AND to NOT IN (SELECT address FROM ethereum.creation_traces)
+        AND to NOT IN (0x000000000000000000000000000000000000dead, 0x0000000000000000000000000000000000000000)
+        AND to NOT IN (SELECT Team_wallet FROM total_supply)
+    GROUP BY to
+),
+wallets_to_track AS (
+   
+    SELECT wallet FROM initial_wallets
+    UNION DISTINCT
+    SELECT wallet FROM level_1_in
+    UNION DISTINCT
+    SELECT wallet FROM level_1_out
+),
+wallet_balances AS (
+    
+    SELECT 
+        to AS wallet, 
+        SUM(value / POW(10, {{decimals}})) AS balance_received
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND to IN (SELECT wallet FROM wallets_to_track)
+    GROUP BY to
+    UNION ALL
+    SELECT 
+        "from" AS wallet, 
+        -SUM(value / POW(10, {{decimals}})) AS balance_sent
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM wallets_to_track)
+    GROUP BY "from"
+),
+final_wallet_balances AS (
+  
+    SELECT 
+        wallet,
+        SUM(balance_received) AS total_balance
+    FROM wallet_balances
+    GROUP BY wallet
+),
+debank_links AS (
+   
+    SELECT 
+        wallet,
+        '<a href="https://debank.com/profile/' || CAST(wallet AS VARCHAR) || '" target="_blank">' || CAST(wallet AS VARCHAR) || '</a>' AS debank_link
+    FROM wallets_to_track
+)
+SELECT
+    debank_links.debank_link AS wallet_link,
+    fwb.total_balance AS balance,
+    (fwb.total_balance / ts.supply) AS supply_percentage
+FROM 
+    final_wallet_balances fwb
+JOIN debank_links ON fwb.wallet = debank_links.wallet
+CROSS JOIN total_supply ts
+ORDER BY fwb.total_balance DESC;

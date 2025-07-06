@@ -1,0 +1,91 @@
+WITH total_supply AS (
+
+    SELECT 
+        value / POW(10, {{decimals}}) AS supply
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+    ORDER BY 
+        evt_block_time ASC
+    LIMIT 1
+),
+initial_wallets AS (
+   
+    SELECT DISTINCT
+        bi.to AS wallet
+    FROM
+        erc20_ethereum.evt_transfer bi
+    LEFT JOIN (
+  
+        SELECT DISTINCT
+            "from" AS wallet
+        FROM
+            erc20_ethereum.evt_transfer
+        WHERE
+            contract_address = {{token}}
+            AND DATE(evt_block_time) BETWEEN DATE('{{start_date}}') AND DATE('{{end_date}}')
+    ) si ON bi.to = si.wallet
+    WHERE
+        bi.contract_address = {{token}}
+        AND DATE(bi.evt_block_time) BETWEEN DATE('{{start_date}}') AND DATE('{{end_date}}')
+        AND bi.to NOT IN (SELECT address FROM ethereum.creation_traces)
+        AND bi.to != 0x000000000000000000000000000000000000dead
+        AND bi.to != 0x0000000000000000000000000000000000000000
+        AND si.wallet IS NULL  
+),
+wallet_flows AS (
+   
+    SELECT 
+        evt_block_time AS timestamp,
+        SUM(value / POW(10, {{decimals}})) AS flow
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND to IN (SELECT wallet FROM initial_wallets)
+    GROUP BY 
+        evt_block_time
+    UNION ALL
+    SELECT 
+        evt_block_time AS timestamp,
+        -SUM(value / POW(10, {{decimals}})) AS flow
+    FROM 
+        erc20_ethereum.evt_transfer
+    WHERE 
+        contract_address = {{token}}
+        AND "from" IN (SELECT wallet FROM initial_wallets)
+    GROUP BY 
+        evt_block_time
+),
+cumulative_balance AS (
+  
+    SELECT 
+        timestamp,
+        SUM(SUM(flow)) OVER (ORDER BY timestamp ASC) AS cumulative_balance
+    FROM 
+        wallet_flows
+    GROUP BY 
+        timestamp
+),
+supply_over_time AS (
+   
+    SELECT
+        timestamp,
+        (SELECT supply FROM total_supply) AS supply
+    FROM
+        wallet_flows
+    GROUP BY 
+        timestamp
+)
+SELECT
+    cb.timestamp AS timestamp,
+    cb.cumulative_balance AS "Cumulative Balance",
+    (cb.cumulative_balance / s.supply) AS "Supply Percentage"
+FROM
+    cumulative_balance cb
+JOIN 
+    supply_over_time s ON cb.timestamp = s.timestamp
+ORDER BY 
+    cb.timestamp ASC;
+

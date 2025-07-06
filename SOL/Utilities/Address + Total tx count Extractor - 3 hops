@@ -1,0 +1,104 @@
+WITH MintingAddresses AS (
+    SELECT
+        to_owner AS wallet_address
+    FROM 
+        tokens_solana.transfers
+    WHERE 
+        token_mint_address = '{{token}}'
+        AND from_owner IS NULL
+),
+
+InitialTransfers AS (
+    SELECT DISTINCT
+        trader_id AS wallet_address
+    FROM
+        dex_solana.trades
+    WHERE
+        token_bought_mint_address = '{{token}}'
+        AND block_time BETWEEN TIMESTAMP '2024-10-11 17:00:00' AND TIMESTAMP '2024-10-13 14:59:00'
+), 
+
+OutflowWallets AS (
+    SELECT DISTINCT
+        ts.to_owner AS wallet_address
+    FROM
+        tokens_solana.transfers ts
+    JOIN
+        InitialTransfers it ON ts.from_owner = it.wallet_address
+    WHERE
+        ts.token_mint_address = '{{token}}'
+),
+
+FilteredOutflowWallets AS (
+    SELECT
+        ow.wallet_address
+    FROM
+        OutflowWallets ow
+    WHERE
+        ow.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+),
+
+Level2OutflowWallets AS (
+    SELECT DISTINCT
+        ts.to_owner AS wallet_address
+    FROM
+        tokens_solana.transfers ts
+    JOIN
+        FilteredOutflowWallets fo ON ts.from_owner = fo.wallet_address
+    WHERE
+        ts.token_mint_address = '{{token}}'
+),
+
+FilteredLevel2OutflowWallets AS (
+    SELECT
+        lw.wallet_address
+    FROM
+        Level2OutflowWallets lw
+    WHERE
+        lw.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+),
+
+Level3OutflowWallets AS (
+    SELECT DISTINCT
+        ts.to_owner AS wallet_address
+    FROM
+        tokens_solana.transfers ts
+    JOIN
+        FilteredLevel2OutflowWallets l2w ON ts.from_owner = l2w.wallet_address
+    WHERE
+        ts.token_mint_address = '{{token}}'
+),
+
+FilteredLevel3OutflowWallets AS (
+    SELECT
+        l3w.wallet_address
+    FROM
+        Level3OutflowWallets l3w
+    WHERE
+        l3w.wallet_address NOT IN (SELECT wallet_address FROM MintingAddresses)
+),
+
+CombinedWallets AS (
+    SELECT wallet_address FROM InitialTransfers
+    UNION DISTINCT
+    SELECT wallet_address FROM FilteredOutflowWallets
+    UNION DISTINCT
+    SELECT wallet_address FROM FilteredLevel2OutflowWallets
+    UNION DISTINCT
+    SELECT wallet_address FROM FilteredLevel3OutflowWallets
+)
+
+SELECT
+    cw.wallet_address,
+    COUNT(DISTINCT ts.tx_id) AS tx_count
+FROM
+    CombinedWallets cw
+JOIN
+    tokens_solana.transfers ts
+ON
+    cw.wallet_address = ts.from_owner OR cw.wallet_address = ts.to_owner
+
+GROUP BY
+    cw.wallet_address
+ORDER BY
+    tx_count DESC;
